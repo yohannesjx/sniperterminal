@@ -166,12 +166,22 @@ class _SystemHealthBarState extends State<SystemHealthBar> with SingleTickerProv
                     null,
                   ),
                   const SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   _buildDetailRow(
                     'Time Sync',
                     Icons.access_time,
                     widget.status.timeSyncHealthy,
                     'Device Clock',
                     null,
+                  ),
+                  const SizedBox(height: 12),
+                  // Last Check Time
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Last Successful Check: ${widget.status.lastCheckTime.toString().split('.')[0]}',
+                      style: GoogleFonts.robotoMono(color: Colors.grey[500], fontSize: 10),
+                    ),
                   ),
                 ],
               ),

@@ -1372,9 +1372,19 @@ func main() {
 	apiKey := SecureLoad(rawApiKey)
 	secretKey := SecureLoad(rawSecretKey)
 
-	// VALIDATION PROBE
+	// VALIDATION PROBE (Periodic 120s Loop)
 	if apiKey != "" && secretKey != "" {
+		// Initial Check
 		apiValidationProbe(apiKey, secretKey)
+
+		// periodic check to prevent rate limits but ensure status is updated
+		go func() {
+			ticker := time.NewTicker(120 * time.Second)
+			defer ticker.Stop()
+			for range ticker.C {
+				apiValidationProbe(apiKey, secretKey)
+			}
+		}()
 	}
 
 	// Log Lengths for Verification
@@ -1751,12 +1761,26 @@ func apiValidationProbe(apiKey, secretKey string) {
 	res, err := client.NewGetAccountService().Do(ctx)
 	if err != nil {
 		log.Printf("⚠️ API KEY VALID but Account Error: %v", err)
+		// Check for 429 or 418
+		if strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "418") {
+			log.Println("🛑 RATELIMIT/BAN DETECTED! Backing off...")
+		}
 		BinanceStatus = "limited" // Key works, but maybe permissions off
 		return
 	}
 
-	log.Printf("✅ API KEYS VALIDATED! Can Trade: %v | Balance: %.2f", res.CanTrade, res.TotalWalletBalance)
-	BinanceStatus = "valid"
+	// Debug Logging
+	rawBytes, _ := json.Marshal(res)
+	log.Printf("🔍 BINANCE ACCOUNT DEBUG: %s", string(rawBytes))
+
+	log.Printf("✅ API KEYS VALIDATED! Can Trade: %v | Can Deposit: %v | Balance: %s", res.CanTrade, res.CanDeposit, res.TotalWalletBalance)
+
+	if !res.CanTrade {
+		log.Println("⚠️ ACCOUNT RESTRICTED: 'CanTrade' is FALSE. Check API Key Permissions.")
+		BinanceStatus = "limited"
+	} else {
+		BinanceStatus = "valid"
+	}
 
 	// Detect Mode (Heuristic: Testnet usually has weird balances or specific flag, but for now specific Env var?)
 	// If the user provided real keys, we assume Production or Testnet based on URL used mainly.

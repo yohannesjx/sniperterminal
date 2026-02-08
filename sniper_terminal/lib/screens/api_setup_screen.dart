@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:sniper_terminal/services/order_signer.dart';
 import 'package:sniper_terminal/providers/sniper_state.dart';

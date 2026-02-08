@@ -47,7 +47,7 @@ dependencies:
   google_sign_in: ^6.2.1
   ntp: ^2.0.0
   carousel_slider: ^5.1.2
-  qr_code_scanner: ^1.0.1
+  mobile_scanner: ^7.1.4
   local_auth: ^3.0.0
   sign_in_with_apple: ^7.0.1
 

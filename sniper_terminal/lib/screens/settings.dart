@@ -4,6 +4,8 @@ import 'package:sniper_terminal/services/order_signer.dart';
 import 'package:sniper_terminal/services/time_sync_service.dart';
 import 'package:sniper_terminal/providers/sniper_state.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:sniper_terminal/screens/qr_scanner_screen.dart';
+import 'dart:convert';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -45,9 +47,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
     await _loadKeys(); // Reload keys for the new environment
   }
-
-import 'package:sniper_terminal/screens/qr_scanner_screen.dart';
-import 'dart:convert';
 
   Future<void> _scanQRCode() async {
     Navigator.push(

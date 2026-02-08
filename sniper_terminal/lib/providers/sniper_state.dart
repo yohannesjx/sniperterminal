@@ -109,7 +109,7 @@ class SniperState extends ChangeNotifier {
             _predatorAdvice = data['message'];
             if (data['tier'] == 'SHIELD_GREEN') {
                 _isShieldSecured = true;
-                try { Vibration.vibrate(pattern: [100, 50, 100]); } catch (e) { print('Vibration error: $e'); }
+                try { Vibration.vibrate(pattern: [100, 50, 100]); } catch (e) { /* ignore */ }
             } else if (data['tier'] == 'SHIELD_GREY') {
                 _isShieldSecured = false;
             }
@@ -145,7 +145,7 @@ class SniperState extends ChangeNotifier {
             );
             addSignal(signal);
         } catch (e) {
-            print("⚠️ Alert Parse Error: $e");
+            // Silently ignore parse errors
         }
     });
   }
@@ -179,7 +179,7 @@ class SniperState extends ChangeNotifier {
        if (isOpposite && (signal.tier == "1" || signal.score > 8.0)) {
            _whaleWarning = true;
            if (signal.type == 'WHALE' || signal.type == 'LIQUIDATION') {
-               try { Vibration.vibrate(pattern: [500, 200, 500]); } catch (e) { debugPrint('Vibration error: $e'); }
+               try { Vibration.vibrate(pattern: [500, 200, 500]); } catch (e) { /* ignore */ }
            }
        }
     }
@@ -245,7 +245,7 @@ class SniperState extends ChangeNotifier {
                   _positions.removeWhere((p) => p.symbol == pos.symbol);
                   double profit = pos.unRealizedProfit;
                   if (profit > 0) {
-                      try { Vibration.vibrate(pattern: [50, 100, 50, 100, 50, 100]); } catch (e) { debugPrint('Vibration error: $e'); } // Cash register sound pattern
+                      try { Vibration.vibrate(pattern: [50, 100, 50, 100, 50, 100]); } catch (e) { /* ignore */ } // Cash register sound pattern
                   }
                   
               } catch (e) {

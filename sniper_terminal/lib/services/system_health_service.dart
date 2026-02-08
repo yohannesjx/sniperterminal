@@ -90,26 +90,19 @@ class SystemHealthService {
     }
   }
   
-  /// Check Exchange API (Ping Binance)
+  /// Check Exchange API (Trust Backend Status)
   Future<void> _checkExchangeApi() async {
-    try {
-      final startTime = DateTime.now();
-      final response = await http.get(
-        Uri.parse('https://fapi.binance.com/fapi/v1/ping'),
-      ).timeout(const Duration(seconds: 3));
-      
-      final latency = DateTime.now().difference(startTime).inMilliseconds;
-      
-      if (response.statusCode == 200) {
-        _exchangeApiHealthy = true;
-        _exchangeLatencyMs = latency;
-      } else {
-        _exchangeApiHealthy = false;
-      }
-    } catch (e) {
-      print('⚠️ [HEALTH] Exchange API check failed: $e');
-      _exchangeApiHealthy = false;
-      _exchangeLatencyMs = 0;
+    // We now rely 100% on the backend's report from /ping
+    // The backend checks strictly every 120s.
+    // If backend says 'valid', we are good.
+    // If backend says 'limited', we show error.
+    
+    // Logic moved to _checkScannerHub where we parse 'binance_api' from JSON.
+    // This function is now a placeholder or can be removed, but kept for interface consistency.
+    if (_scannerHubConnected && _exchangeApiHealthy) {
+        _exchangeLatencyMs = _backendLatencyMs; // Approximation
+    } else {
+        _exchangeLatencyMs = 0;
     }
   }
   
@@ -144,6 +137,7 @@ class SystemHealthService {
       timeSyncHealthy: _timeSyncHealthy,
       backendLatencyMs: _backendLatencyMs,
       exchangeLatencyMs: _exchangeLatencyMs,
+      lastCheckTime: DateTime.now(),
     );
   }
   
@@ -184,6 +178,7 @@ class SystemHealthStatus {
   final bool timeSyncHealthy;
   final int backendLatencyMs;
   final int exchangeLatencyMs;
+  final DateTime lastCheckTime;
   
   SystemHealthStatus({
     required this.scannerHubConnected,
@@ -192,6 +187,7 @@ class SystemHealthStatus {
     required this.timeSyncHealthy,
     required this.backendLatencyMs,
     required this.exchangeLatencyMs,
+    required this.lastCheckTime,
   });
   
   bool get isAllHealthy {

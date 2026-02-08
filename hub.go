@@ -56,6 +56,29 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		conn.Close()
 	}()
 
+	// WebSocket Heartbeat Config
+	const (
+		writeWait      = 10 * time.Second
+		pongWait       = 60 * time.Second
+		pingPeriod     = (pongWait * 9) / 10
+		maxMessageSize = 512
+	)
+
+	conn.SetReadLimit(maxMessageSize)
+	conn.SetReadDeadline(time.Now().Add(pongWait))
+	conn.SetPongHandler(func(string) error { conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+
+	// Start Pinger
+	go func() {
+		ticker := time.NewTicker(pingPeriod)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait)); err != nil {
+				return // Stop Pinger if write fails
+			}
+		}
+	}()
+
 	for {
 		if _, _, err := conn.ReadMessage(); err != nil {
 			break
