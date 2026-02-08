@@ -12,9 +12,24 @@ import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    print("⚠️ DefaultFirebaseOptions not found or failed. Trying manual init...");
+    await Firebase.initializeApp(
+      name: 'sniper-terminal',
+      options: const FirebaseOptions(
+        apiKey: 'AIzaSyBG98-rZtXgw8YKf1W6IgleqqWQLhkjfMc',
+        appId: '1:971965790876:ios:69ed00e604aa2ac7ed8b59', // Using iOS App ID as fallback
+        messagingSenderId: '971965790876',
+        projectId: 'scanner-984c7',
+        storageBucket: 'scanner-984c7.firebasestorage.app',
+      ),
+    );
+  }
   
   runApp(
     MultiProvider(

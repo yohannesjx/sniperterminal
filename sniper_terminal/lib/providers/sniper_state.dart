@@ -93,7 +93,7 @@ class SniperState extends ChangeNotifier {
     _loadSettings();
     
     // Initialize System Health Monitoring
-    _healthService = SystemHealthService(backendUrl: 'http://192.168.1.26:8081');
+    _healthService = SystemHealthService(backendUrl: 'http://152.53.87.200:8083');
     _healthService.onHealthUpdate = (status) {
       _healthStatus = status;
       notifyListeners();

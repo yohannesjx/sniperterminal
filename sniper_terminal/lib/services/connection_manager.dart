@@ -15,16 +15,16 @@ class ConnectionManager {
       host = '10.0.2.2'; 
     } else if (Platform.isIOS) {
        // Physical Device & Simulator (LAN IP)
-      host = '192.168.1.26';
+      host = '152.53.87.200';
     } else {
       // Physical Device fallback
-      host = '192.168.1.26'; 
+      host = '152.53.87.200'; 
     }
 
     // Sanitize path
     final cleanPath = path.replaceAll('#', '').trim();
-    // API Server runs on 8080
-    return 'http://$host:8080$cleanPath';
+    // API Server runs on 8083
+    return 'http://$host:8083$cleanPath';
   }
 
   /// Returns the appropriate WebSocket URL based on the environment.

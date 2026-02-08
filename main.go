@@ -1332,10 +1332,21 @@ func main() {
 	log.Println("🚀 Whale Radar Engine V1 Starting...")
 	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
+	// 0. STARTUP DELAY (Let env stabilize)
+	time.Sleep(1 * time.Second)
+
 	// Load Environment Variables
 	err := godotenv.Load()
 	if err != nil {
 		log.Println("⚠️ No .env file found, relying on OS environment variables")
+	}
+
+	// ROBUST KEY CHECK
+	if _, ok := os.LookupEnv("BINANCE_API_KEY"); !ok {
+		log.Println("⚠️ WARNING: BINANCE_API_KEY is missing from environment")
+	}
+	if _, ok := os.LookupEnv("BINANCE_SECRET_KEY"); !ok {
+		log.Println("⚠️ WARNING: BINANCE_SECRET_KEY is missing from environment")
 	}
 
 	// 1. Initialize Channels
@@ -1436,20 +1447,20 @@ func main() {
 	go privateHub.Run()
 
 	// Use a separate Mux for the Signal Hub to avoid conflict with default mux
-	signalMux := http.NewServeMux()
+	// signalMux := http.NewServeMux() // Removed in favor of DefaultServeMux
 
 	// Public Feed (Signals Only)
-	signalMux.HandleFunc("/ws/public", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/ws/public", func(w http.ResponseWriter, r *http.Request) {
 		ServeWs(publicHub, w, r)
 	})
 
 	// Private Feed (Account Updates - Authenticated)
-	signalMux.HandleFunc("/ws/private", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/ws/private", func(w http.ResponseWriter, r *http.Request) {
 		ServeWs(privateHub, w, r)
 	})
 
 	// 🧪 TEST ROUTE: Manually Trigger a Broadcast
-	signalMux.HandleFunc("/broadcast-test", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/broadcast-test", func(w http.ResponseWriter, r *http.Request) {
 		dummy := Signal{
 			ID:        fmt.Sprintf("TEST-%d", time.Now().UnixMilli()),
 			Symbol:    "BTCUSDT",
@@ -1467,15 +1478,8 @@ func main() {
 		w.Write([]byte("✅ Test Signal Broadcasted!"))
 	})
 
-	// Start HTTP Server for WebSockets (Background)
-	go func() {
-		log.Println("📡 SIGNAL HUB: Listening on :8081")
-		log.Println("   ├── /ws/public  (Signals)")
-		log.Println("   └── /ws/private (Account)")
-		if err := http.ListenAndServe(":8081", signalMux); err != nil {
-			log.Fatal("WS ListenAndServe: ", err)
-		}
-	}()
+	// 📡 SIGNAL HUB: Routes migrated to main HTTP server
+	log.Println("📡 SIGNAL HUB: Ready")
 
 	// 🦖 INITIALIZE PREDATOR ENGINE (Autonomous Scalper)
 	cfg := config.LoadConfig()
@@ -1619,6 +1623,9 @@ func main() {
 		w.Write([]byte("ok"))
 	})
 
+	// Health Check (Docker Friendly)
+	http.HandleFunc("/health", SimpleHealthCheck)
+
 	// System Health Ping - Returns server time and latency metrics
 	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -1701,8 +1708,8 @@ func main() {
 	)
 
 	log.Println("✅ All systems go")
-	log.Println("🌐 Server running on :8081")
-	if err := http.ListenAndServe(":8081", nil); err != nil {
+	log.Println("🌐 Server running on 0.0.0.0:8081")
+	if err := http.ListenAndServe("0.0.0.0:8081", nil); err != nil {
 		log.Fatal(err)
 	}
 }
