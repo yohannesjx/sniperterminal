@@ -84,13 +84,16 @@ class _SystemHealthBarState extends State<SystemHealthBar> with SingleTickerProv
                   // Status Text
                   Expanded(
                     child: Text(
-                      isHealthy ? 'ALL SYSTEMS OPERATIONAL' : 'SYSTEM OFFLINE',
+                      isHealthy 
+                          ? 'ALL SYSTEMS OPERATIONAL' 
+                          : widget.status.statusMessage.toUpperCase(), // Show specific error
                       style: GoogleFonts.orbitron(
                         color: barColor,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 1,
                       ),
+                      overflow: TextOverflow.ellipsis, // Handle long messages
                     ),
                   ),
                   

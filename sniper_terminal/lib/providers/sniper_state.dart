@@ -58,6 +58,8 @@ class SniperState extends ChangeNotifier {
     timeSyncHealthy: false,
     backendLatencyMs: 0,
     exchangeLatencyMs: 0,
+    lastCheckTime: DateTime.now(), // Initial
+    statusMessage: 'Initializing...',
   );
   
   SystemHealthStatus get healthStatus => _healthStatus;

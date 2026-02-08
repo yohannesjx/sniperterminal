@@ -19,6 +19,7 @@ class SystemHealthService {
   // Latency metrics
   int _backendLatencyMs = 0;
   int _exchangeLatencyMs = 0;
+  String _statusMessage = 'Initializing...'; // Default
   
   // Periodic check timer
   Timer? _healthCheckTimer;
@@ -65,7 +66,7 @@ class SystemHealthService {
       final startTime = DateTime.now();
       final response = await http.get(
         Uri.parse('$_backendUrl/ping'),
-      ).timeout(const Duration(seconds: 3));
+      ).timeout(const Duration(seconds: 10));
       
       final latency = DateTime.now().difference(startTime).inMilliseconds;
       
@@ -76,17 +77,21 @@ class SystemHealthService {
         
         // Sync API Status from Backend
         if (data.containsKey('binance_api')) {
-           bool isValid = data['binance_api'] == 'valid';
+           final status = data['binance_api'];
+           bool isValid = status == 'valid';
            _exchangeApiHealthy = isValid; // Trust server's validation
-           print('🔍 Backend Reports Binance API: ${data['binance_api']}');
+           _statusMessage = isValid ? 'Operational' : 'Binance: $status'; // Set status message
+           if (!isValid) print('🔍 Backend Reports Binance API: $status');
         }
       } else {
         _scannerHubConnected = false;
+        _statusMessage = 'Backend HTTP Error ${response.statusCode}';
       }
     } catch (e) {
       print('⚠️ [HEALTH] Scanner Hub check failed: $e');
       _scannerHubConnected = false;
       _backendLatencyMs = 0;
+      _statusMessage = 'Connection Failed'; // Set generic error
     }
   }
   
@@ -138,6 +143,7 @@ class SystemHealthService {
       backendLatencyMs: _backendLatencyMs,
       exchangeLatencyMs: _exchangeLatencyMs,
       lastCheckTime: DateTime.now(),
+      statusMessage: _statusMessage,
     );
   }
   
@@ -179,6 +185,7 @@ class SystemHealthStatus {
   final int backendLatencyMs;
   final int exchangeLatencyMs;
   final DateTime lastCheckTime;
+  final String statusMessage; // New field for detailed error
   
   SystemHealthStatus({
     required this.scannerHubConnected,
@@ -188,6 +195,7 @@ class SystemHealthStatus {
     required this.backendLatencyMs,
     required this.exchangeLatencyMs,
     required this.lastCheckTime,
+    required this.statusMessage,
   });
   
   bool get isAllHealthy {

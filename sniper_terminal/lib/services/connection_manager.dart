@@ -23,8 +23,8 @@ class ConnectionManager {
 
     // Sanitize path
     final cleanPath = path.replaceAll('#', '').trim();
-    // API Server runs on 8081 (Go Mux)
-    return 'http://$host:8081$cleanPath';
+    // API Server runs on 8083 (Mapped via Docker)
+    return 'http://$host:8083$cleanPath';
   }
 
   /// Returns the appropriate WebSocket URL based on the environment.
@@ -34,8 +34,8 @@ class ConnectionManager {
 
     // Sanitize path
     final cleanPath = path.replaceAll('#', '').trim();
-    // WebSocket Server runs on 8081 (Same as HTTP)
-    return 'ws://$host:8081$cleanPath';
+    // WebSocket Server runs on 8083 (Mapped via Docker)
+    return 'ws://$host:8083$cleanPath';
   }
 
   /// connect with Exponential Backoff
