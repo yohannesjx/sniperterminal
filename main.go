@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -12,8 +13,6 @@ import (
 	"sync"
 	"time"
 	"whale-radar/config"
-
-	"math/rand"
 
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/gorilla/websocket"
