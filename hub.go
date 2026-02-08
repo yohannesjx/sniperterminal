@@ -30,6 +30,7 @@ func NewHub() *Hub {
 
 // HandleWebSocket manages the websocket connection lifecycle
 func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Headers: %v", r.Header)
 	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("Upgrade error: %v", err)
