@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -14,7 +13,6 @@ import (
 	"time"
 	"whale-radar/config"
 
-	"github.com/adshao/go-binance/v2/futures"
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
 )
@@ -1369,22 +1367,18 @@ func main() {
 	rawSecretKey := os.Getenv("BINANCE_SECRET_KEY")
 
 	// FIX ERROR -2014 (SecureLoad)
+	// FIX ERROR -2014 (SecureLoad)
 	apiKey := SecureLoad(rawApiKey)
 	secretKey := SecureLoad(rawSecretKey)
 
 	// VALIDATION PROBE (Periodic 120s Loop)
 	if apiKey != "" && secretKey != "" {
-		// Initial Check
-		apiValidationProbe(apiKey, secretKey)
-
-		// periodic check to prevent rate limits but ensure status is updated
-		go func() {
-			ticker := time.NewTicker(120 * time.Second)
-			defer ticker.Stop()
-			for range ticker.C {
-				apiValidationProbe(apiKey, secretKey)
-			}
-		}()
+		// ---------------------------------------------------------
+		// REMOVED: Server-Side Key Validation (Moved to Client)
+		// ---------------------------------------------------------
+		// The backend now acts as a pure Signal Provider.
+		// It does not validate user keys to avoid IP restrictions.
+		BinanceStatus = "unchecked" // Default status
 	}
 
 	// Log Lengths for Verification
@@ -1737,53 +1731,3 @@ var (
 	BinanceStatus = "unknown"
 	ExchangeMode  = "testnet" // Default to testnet safely
 )
-
-// apiValidationProbe makes a dummy call to verify keys BEFORE starting
-func apiValidationProbe(apiKey, secretKey string) {
-	log.Println("🔌 PROBE: Verifying API Keys with Binance...")
-
-	// Use Futures Client for Probe
-	client := futures.NewClient(apiKey, secretKey)
-
-	// Create context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Ping Binance
-	err := client.NewPingService().Do(ctx)
-	if err != nil {
-		log.Printf("❌ API PROBE FAILED: %v", err)
-		BinanceStatus = "invalid"
-		return
-	}
-
-	// Check Account Status (Weighty)
-	res, err := client.NewGetAccountService().Do(ctx)
-	if err != nil {
-		log.Printf("⚠️ API KEY VALID but Account Error: %v", err)
-		// Check for 429 or 418
-		if strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "418") {
-			log.Println("🛑 RATELIMIT/BAN DETECTED! Backing off...")
-		}
-		BinanceStatus = "limited" // Key works, but maybe permissions off
-		return
-	}
-
-	// Debug Logging
-	rawBytes, _ := json.Marshal(res)
-	log.Printf("🔍 BINANCE ACCOUNT DEBUG: %s", string(rawBytes))
-
-	log.Printf("✅ API KEYS VALIDATED! Can Trade: %v | Can Deposit: %v | Balance: %s", res.CanTrade, res.CanDeposit, res.TotalWalletBalance)
-
-	if !res.CanTrade {
-		log.Println("⚠️ ACCOUNT RESTRICTED: 'CanTrade' is FALSE. Check API Key Permissions.")
-		BinanceStatus = "limited"
-	} else {
-		BinanceStatus = "valid"
-	}
-
-	// Detect Mode (Heuristic: Testnet usually has weird balances or specific flag, but for now specific Env var?)
-	// If the user provided real keys, we assume Production or Testnet based on URL used mainly.
-	// The library defaults to Production unless Debug is on? No, checking BaseURL.
-	// For now, let's assume if it works, it's valid.
-}

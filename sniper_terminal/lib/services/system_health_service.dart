@@ -72,17 +72,9 @@ class SystemHealthService {
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        _scannerHubConnected = data['status'] == 'online'; // Updated to 'online'
+        _scannerHubConnected = data['status'] == 'online'; 
         _backendLatencyMs = latency;
-        
-        // Sync API Status from Backend
-        if (data.containsKey('binance_api')) {
-           final status = data['binance_api'];
-           bool isValid = status == 'valid';
-           _exchangeApiHealthy = isValid; // Trust server's validation
-           _statusMessage = isValid ? 'Operational' : 'Binance: $status'; // Set status message
-           if (!isValid) print('🔍 Backend Reports Binance API: $status');
-        }
+        // Backend no longer provides 'binance_api' status (Client-Side Execution)
       } else {
         _scannerHubConnected = false;
         _statusMessage = 'Backend HTTP Error ${response.statusCode}';
@@ -91,34 +83,50 @@ class SystemHealthService {
       print('⚠️ [HEALTH] Scanner Hub check failed: $e');
       _scannerHubConnected = false;
       _backendLatencyMs = 0;
-      _statusMessage = 'Connection Failed'; // Set generic error
+      _statusMessage = 'Connect Failed';
     }
   }
   
-  /// Check Exchange API (Trust Backend Status)
+  /// Check Exchange API (Direct Ping from Device)
   Future<void> _checkExchangeApi() async {
-    // We now rely 100% on the backend's report from /ping
-    // The backend checks strictly every 120s.
-    // If backend says 'valid', we are good.
-    // If backend says 'limited', we show error.
-    
-    // Logic moved to _checkScannerHub where we parse 'binance_api' from JSON.
-    // This function is now a placeholder or can be removed, but kept for interface consistency.
-    if (_scannerHubConnected && _exchangeApiHealthy) {
-        _exchangeLatencyMs = _backendLatencyMs; // Approximation
-    } else {
+    try {
+      final startTime = DateTime.now();
+      // Ping Binance Futures Public API
+      final response = await http.get(
+        Uri.parse('https://fapi.binance.com/fapi/v1/time'),
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        _exchangeApiHealthy = true;
+        _exchangeLatencyMs = DateTime.now().difference(startTime).inMilliseconds;
+      } else {
+        _exchangeApiHealthy = false;
         _exchangeLatencyMs = 0;
+      }
+    } catch (e) {
+      print('⚠️ [HEALTH] Exchange API check failed: $e');
+      _exchangeApiHealthy = false;
+      _exchangeLatencyMs = 0;
     }
   }
   
   /// Check Auth State (Verify API keys are loaded and valid)
   Future<void> _checkAuthState() async {
     try {
+      // Local Validation using OrderSigner
       final result = await _orderSigner.checkPermissions();
-      _authStateValid = result.contains('✅') && result.contains('Futures');
+      _authStateValid = result.contains('✅'); // Just check for success mark
+      
+      if (_authStateValid) {
+         _statusMessage = 'Operational';
+      } else {
+         // Extract error message from result
+         _statusMessage = result.replaceAll('❌', '').trim(); 
+      }
     } catch (e) {
       print('⚠️ [HEALTH] Auth state check failed: $e');
       _authStateValid = false;
+      _statusMessage = 'Auth Check Error';
     }
   }
   
