@@ -71,8 +71,15 @@ class SystemHealthService {
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        _scannerHubConnected = data['status'] == 'ok';
+        _scannerHubConnected = data['status'] == 'online'; // Updated to 'online'
         _backendLatencyMs = latency;
+        
+        // Sync API Status from Backend
+        if (data.containsKey('binance_api')) {
+           bool isValid = data['binance_api'] == 'valid';
+           _exchangeApiHealthy = isValid; // Trust server's validation
+           print('🔍 Backend Reports Binance API: ${data['binance_api']}');
+        }
       } else {
         _scannerHubConnected = false;
       }

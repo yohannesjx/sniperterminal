@@ -1,0 +1,30 @@
+# How to Enable Push Notifications (FCM)
+
+The server logs indicate that `serviceAccountKey.json` is missing. This file is required for Firebase Cloud Messaging (Push Notifications) to work.
+
+## Steps to Fix
+
+1.  **Locate the file**: Find your `serviceAccountKey.json` on your local machine. It should have been downloaded from the Firebase Console.
+
+2.  **Upload to Server**: Use `scp` to copy it to the server. Run this command from your **local terminal**:
+
+    ```bash
+    scp /path/to/your/serviceAccountKey.json root@152.53.87.200:/root/sniperterminal/serviceAccountKey.json
+    ```
+
+    *Replace `/path/to/your/` with the actual path on your computer.*
+
+3.  **Restart the Server**:
+    After uploading, log in to the server and restart the container:
+
+    ```bash
+    ssh root@152.53.87.200
+    cd sniperterminal
+    docker-compose restart sniper-backend
+    ```
+
+4.  **Verify**:
+    Check the logs to ensure the error is gone:
+    ```bash
+    docker logs -f sniper-backend
+    ```

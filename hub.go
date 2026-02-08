@@ -39,6 +39,16 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	h.register(conn)
 
+	// Send Initial Connection Status
+	initMsg := map[string]interface{}{
+		"type":        "connection_init",
+		"status":      "connected",
+		"binance_api": BinanceStatus,
+		"exchange":    ExchangeMode,
+		"timestamp":   time.Now().UnixMilli(),
+	}
+	conn.WriteJSON(initMsg)
+
 	// Keep connection alive (Read Loop)
 	// We don't process incoming messages in V1, but the loop is required to detect disconnects
 	defer func() {

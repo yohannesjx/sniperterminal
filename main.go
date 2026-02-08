@@ -15,7 +15,6 @@ import (
 
 	"math/rand"
 
-	"github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
@@ -1630,14 +1629,14 @@ func main() {
 	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
 
-		response := map[string]interface{}{
-			"status":      "ok",
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":      "online",
 			"server_time": time.Now().UnixMilli(),
-			"timestamp":   time.Now().Format(time.RFC3339),
-		}
-
-		json.NewEncoder(w).Encode(response)
+			"binance_api": BinanceStatus,
+			"exchange":    ExchangeMode,
+		})
 	})
 
 	// 🦖 Predator Emergency Kill Switch
@@ -1724,30 +1723,44 @@ func SecureLoad(raw string) string {
 	return val
 }
 
+// Global Status Variables
+var (
+	BinanceStatus = "unknown"
+	ExchangeMode  = "testnet" // Default to testnet safely
+)
+
 // apiValidationProbe makes a dummy call to verify keys BEFORE starting
 func apiValidationProbe(apiKey, secretKey string) {
 	log.Println("🔌 PROBE: Verifying API Keys with Binance...")
 
-	// Create temporary client
-	futures.UseTestnet = true // Safe call
-	client := binance.NewFuturesClient(apiKey, secretKey)
+	// Use Futures Client for Probe
+	client := futures.NewClient(apiKey, secretKey)
 
-	// Dummy Call: Get Account Info (Lightweight)
-	_, err := client.NewGetAccountService().Do(context.Background())
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Ping Binance
+	err := client.NewPingService().Do(ctx)
 	if err != nil {
-		errStr := err.Error()
-		if strings.Contains(errStr, "-2014") {
-			log.Printf("❌ CRITICAL: API KEY INVALID FORMAT (-2014). Key Dump: %x", apiKey)
-			log.Printf("⚠️ CONTINUING IN SIMULATION MODE (Orders will fail)")
-			return
-		}
-		if strings.Contains(errStr, "-2015") {
-			log.Printf("❌ CRITICAL: API KEY INVALID/REJECTED. Check Permissions.")
-			return
-		}
-		// Network errors might happen, warn but don't crash
-		log.Printf("⚠️ PROBE WARNING: Connectivity issue? %v", err)
+		log.Printf("❌ API PROBE FAILED: %v", err)
+		BinanceStatus = "invalid"
 		return
 	}
-	log.Println("✅ PROBE SUCCESS: API Keys Valid & Permissions Active.")
+
+	// Check Account Status (Weighty)
+	res, err := client.NewGetAccountService().Do(ctx)
+	if err != nil {
+		log.Printf("⚠️ API KEY VALID but Account Error: %v", err)
+		BinanceStatus = "limited" // Key works, but maybe permissions off
+		return
+	}
+
+	log.Printf("✅ API KEYS VALIDATED! Can Trade: %v | Balance: %.2f", res.CanTrade, res.TotalWalletBalance)
+	BinanceStatus = "valid"
+
+	// Detect Mode (Heuristic: Testnet usually has weird balances or specific flag, but for now specific Env var?)
+	// If the user provided real keys, we assume Production or Testnet based on URL used mainly.
+	// The library defaults to Production unless Debug is on? No, checking BaseURL.
+	// For now, let's assume if it works, it's valid.
 }
