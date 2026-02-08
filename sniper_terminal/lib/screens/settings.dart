@@ -46,6 +46,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _loadKeys(); // Reload keys for the new environment
   }
 
+import 'package:sniper_terminal/screens/qr_scanner_screen.dart';
+import 'dart:convert';
+
+  Future<void> _scanQRCode() async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => QRScannerScreen(
+          onScanned: (data) {
+            bool success = false;
+            try {
+              // 1. Try JSON Format: {"apiKey": "...", "secretKey": "..."}
+              if (data.trim().startsWith('{')) {
+                final jsonMap = json.decode(data);
+                if (jsonMap is Map) {
+                   final key = jsonMap['apiKey'] ?? jsonMap['APIKey'];
+                   final secret = jsonMap['secretKey'] ?? jsonMap['SecretKey'];
+                   
+                   if (key != null && secret != null) {
+                      setState(() {
+                        _apiKeyController.text = key.toString();
+                        _secretKeyController.text = secret.toString();
+                      });
+                      success = true;
+                   }
+                }
+              }
+            } catch (e) {
+              // JSON parse failed, try other formats
+            }
+
+            if (!success) {
+                // 2. Try Legacy Format: "apiKey:secretKey"
+                if (data.contains(':') && !data.contains('{')) {
+                  final parts = data.split(':');
+                  if (parts.length >= 2) {
+                    setState(() {
+                      _apiKeyController.text = parts[0].trim();
+                      _secretKeyController.text = parts[1].trim();
+                    });
+                    success = true;
+                  }
+                } else {
+                  // 3. Fallback: Entire string as API Key
+                  setState(() {
+                     _apiKeyController.text = data.trim();
+                  });
+                  success = true; // Partial success
+                }
+            }
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(success ? '✅ QR Code Parsed' : '⚠️ Format Not Recognized')),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _checkPermissions() async {
       // Temporarily save first to ensure we check current inputs
       await _orderSigner.saveKeys(_apiKeyController.text.trim(), _secretKeyController.text.trim());
@@ -133,6 +193,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: const TextStyle(color: Colors.white),
                 obscureText: true,
               ),
+              const SizedBox(height: 10),
+              
+              // QR Scanner Button
+              OutlinedButton.icon(
+                onPressed: _scanQRCode,
+                icon: const Icon(Icons.qr_code_scanner, color: Colors.cyanAccent),
+                label: Text(
+                  'SCAN QR CODE',
+                  style: GoogleFonts.orbitron(color: Colors.cyanAccent),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.cyanAccent),
+                  minimumSize: const Size(double.infinity, 50),
+                ),
+              ),
+              
               const SizedBox(height: 30),
               ElevatedButton(
                 onPressed: () async {

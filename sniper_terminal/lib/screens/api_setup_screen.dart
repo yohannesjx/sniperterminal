@@ -9,6 +9,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:sniper_terminal/services/order_signer.dart';
 import 'package:sniper_terminal/providers/sniper_state.dart';
 import 'package:sniper_terminal/screens/dashboard.dart';
+import 'package:sniper_terminal/screens/qr_scanner_screen.dart';
 
 class ApiSetupScreen extends StatefulWidget {
   const ApiSetupScreen({super.key});
@@ -619,67 +620,4 @@ class _ApiSetupScreenState extends State<ApiSetupScreen> with SingleTickerProvid
   }
 }
 
-// QR Scanner Screen
-class QRScannerScreen extends StatefulWidget {
-  final Function(String) onScanned;
-  
-  const QRScannerScreen({super.key, required this.onScanned});
 
-  @override
-  State<QRScannerScreen> createState() => _QRScannerScreenState();
-}
-
-class _QRScannerScreenState extends State<QRScannerScreen> {
-  final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
-  QRViewController? controller;
-  bool _hasScanned = false;
-
-  @override
-  void dispose() {
-    controller?.dispose();
-    super.dispose();
-  }
-
-  void _onQRViewCreated(QRViewController controller) {
-    this.controller = controller;
-    controller.scannedDataStream.listen((scanData) {
-      if (scanData.code != null && !_hasScanned) {
-        setState(() {
-          _hasScanned = true;
-        });
-        controller.pauseCamera();
-        widget.onScanned(scanData.code!);
-        if (mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-             Navigator.pop(context);
-          });
-        }
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        title: Text(
-          'SCAN QR CODE',
-          style: GoogleFonts.orbitron(fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: QRView(
-        key: qrKey,
-        onQRViewCreated: _onQRViewCreated,
-        overlay: QrScannerOverlayShape(
-          borderColor: Colors.greenAccent,
-          borderRadius: 10,
-          borderLength: 30,
-          borderWidth: 10,
-          cutOutSize: 300,
-        ),
-      ),
-    );
-  }
-}
