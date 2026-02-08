@@ -1,0 +1,25 @@
+# Ignore build artifacts
+whale-radar
+whale-radar-linux
+whale-radar-mac
+whale-radar.exe
+
+# Ignore Git
+.git
+.gitignore
+
+# Ignore documentation
+README.md
+*.md
+
+# Ignore IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Mobile Apps
+sniper_terminal/
+ios/
+android/
+.env

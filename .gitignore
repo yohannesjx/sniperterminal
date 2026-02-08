@@ -1,0 +1,33 @@
+# Secrets
+.env
+serviceAccountKey.json
+*.pem
+*.key
+
+# OS
+.DS_Store
+
+# Build artifacts
+whale-radar
+whale-radar-linux
+whale-radar-mac
+whale-radar.exe
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Mobile Apps Build Artifacts
+sniper_terminal/build/
+sniper_terminal/.dart_tool/
+sniper_terminal/.flutter-plugins
+sniper_terminal/.flutter-plugins-dependencies
+sniper_terminal/.pub-cache/
+sniper_terminal/.pub/
+sniper_terminal/ios/Flutter/Generated.xcconfig
+sniper_terminal/ios/Flutter/app.flx
+sniper_terminal/ios/Flutter/app.zip
+sniper_terminal/ios/Flutter/flutter_assets/
+sniper_terminal/ios/ServiceDefinitions.json

@@ -1,0 +1,54 @@
+name: whale_radar
+description: Real-time cryptocurrency whale tracking radar
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # State Management
+  flutter_riverpod: ^2.4.9
+  
+  # WebSocket
+  web_socket_channel: ^3.0.3
+  
+  # JSON
+  json_annotation: ^4.8.1
+  
+  # UI
+  glassmorphism: ^3.0.0
+  
+  cupertino_icons: ^1.0.2
+  flutter_tts: ^4.2.5
+  vibration: ^3.1.5
+  flutter_local_notifications: ^20.0.0
+  firebase_core: ^4.4.0
+  firebase_messaging: ^16.1.1
+  
+  # Crypto & Network
+  crypto: ^3.0.3
+  http: ^1.2.0
+
+  # Secure Features
+  flutter_secure_storage: ^9.0.0
+  local_auth: ^2.1.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  json_serializable: ^6.7.1
+  build_runner: ^2.4.7
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/whale.png
+    - assets/iceberg.png
+    - assets/live_feed.png
+    - assets/radar_grid.png
