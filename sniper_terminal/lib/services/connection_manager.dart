@@ -43,7 +43,7 @@ class ConnectionManager {
     // Assuming 'path' variable passed to this function might be empty or specific endpoint.
     // If the usage is `getWebSocketUrl('/ws/public')` then we just need the host.
     // Let's assume the callers pass the path.
-    return 'ws://$host:8081$cleanPath';
+    return 'ws://$host:8083$cleanPath';
   }
 
   /// connect with Exponential Backoff

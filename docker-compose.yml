@@ -4,7 +4,7 @@ services:
   sniper-backend:
     build: .
     ports:
-      - "8081:8081"
+      - "8083:8081"
     restart: always
     env_file:
       - .env
