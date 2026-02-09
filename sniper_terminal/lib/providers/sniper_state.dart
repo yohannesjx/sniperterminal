@@ -16,13 +16,23 @@ class SniperState extends ChangeNotifier {
   String? _apiKey;
   String? _secretKey;
 
+  // Max Hold Time Default (120 min)
+  int _maxHoldTime = 120;
+  int get maxHoldTime => _maxHoldTime;
+
+  Future<void> setMaxHoldTime(int val) async {
+    _maxHoldTime = val;
+    await _storage.write(key: 'max_hold_time', value: val.toString());
+    notifyListeners();
+  }
+
   // Risk Management
   double _riskAmount = 10.0; // Default $10 risk per trade
   double get riskAmount => _riskAmount;
   
   // Margin Range Safety Lane ($50 - $60)
   double _minMargin = 50.0;
-  double _maxMargin = 60.0;
+  double _maxMargin = 60.0; // Default 50-60 USDT
   
   double get minMargin => _minMargin;
   double get maxMargin => _maxMargin;
@@ -157,12 +167,26 @@ class SniperState extends ChangeNotifier {
 
     WebSocketService().alertStream.listen((data) {
         try {
-            final type = data['type'];
+            var type = data['type'];
             final toSym = data['symbol'];
-            if (toSym == null || type == null) return;
+            var tier = data['tier'];
+
+            // SUPPORT BOTH ALERT AND SIGNAL FORMATS
+            if (toSym == null) return;
+            if (type == null && tier == null) return;
+
+            // If it's a Signal (has tier but no type), force type = SIGNAL
+            if (type == null && tier != null) {
+                type = 'SIGNAL';
+            }
+            // If it's an Alert (has type but no tier), use type as tier
+            if (tier == null && type != null) {
+                tier = type;
+            }
 
             final price = (data['price'] as num?)?.toDouble() ?? 0.0;
-            final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+            final amount = (data['amount'] as num?)?.toDouble() ?? 
+                          (data['score'] as num?)?.toDouble() ?? 0.0; // Handle score
             final side = data['side'] ?? 'UNKNOWN';
 
             // FILTER: Ignore invalid signals to prevent UI "Unknown/0" storage
@@ -170,14 +194,14 @@ class SniperState extends ChangeNotifier {
 
             // Create Visual Signal
             final signal = Signal(
-                id: DateTime.now().microsecondsSinceEpoch.toString(), // Alerts might not have ID, generate one
+                id: data['id'] ?? DateTime.now().microsecondsSinceEpoch.toString(),
                 symbol: toSym,
                 side: side,
                 price: price,
                 score: amount, 
-                tier: type,
-                tp: price * (side == "LONG" ? 1.02 : 0.98), // Simulated TP
-                sl: price * (side == "LONG" ? 0.99 : 1.01), // Simulated SL
+                tier: tier.toString(),
+                tp: (data['tp'] as num?)?.toDouble() ?? price * (side == "LONG" ? 1.02 : 0.98),
+                sl: (data['sl'] as num?)?.toDouble() ?? price * (side == "LONG" ? 0.99 : 1.01),
                 timestamp: DateTime.now().millisecondsSinceEpoch,
                 type: type,
             );
@@ -190,8 +214,11 @@ class SniperState extends ChangeNotifier {
 
   // Available Coins for Swipe Navigation
   final List<String> _availableCoins = const [
-    'BTC', 'ETH', 'SOL', 'BNB', 'XRP', 
-    'ADA', 'DOGE', 'AVAX', 'TRX', 'PEPE'
+    'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 
+    'SUI', 'AVAX', 'ADA', 'DOGE', 'LINK',
+    'HYPE', 'FET', 'TAO', 'ARB', 'OP',
+    'PEPE', 'WIF', 'SHIB', 'TRX', 'LTC',
+    'NEAR', 'INJ', 'APT', 'RENDER', 'SEI'
   ];
   List<String> get availableCoins => _availableCoins;
 
@@ -226,7 +253,8 @@ class SniperState extends ChangeNotifier {
 
   void addSignal(Signal signal) {
     // FILTER: Only allow Tier 1 unless Aggressive Mode is ON
-    if (signal.tier != "1" && !_isAggressiveMode) {
+    bool isTier1 = signal.tier.contains("Tier 1") || signal.tier == "1";
+    if (!isTier1 && !_isAggressiveMode) {
         return; 
     }
 
@@ -242,7 +270,7 @@ class SniperState extends ChangeNotifier {
        if (_activePosition!.side == "LONG" && signal.side == "SHORT") isOpposite = true;
        if (_activePosition!.side == "SHORT" && signal.side == "LONG") isOpposite = true;
        
-       if (isOpposite && (signal.tier == "1" || signal.score > 8.0)) {
+       if (isOpposite && (signal.tier.contains("Tier 1") || signal.tier == "1" || signal.score > 8.0)) {
            _whaleWarning = true;
            if (signal.type == 'WHALE' || signal.type == 'LIQUIDATION') {
                try { Vibration.vibrate(pattern: [500, 200, 500]); } catch (e) { /* ignore */ }
@@ -449,30 +477,51 @@ class SniperState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setProfitTarget(double targetPrice) async { // NEW
+  Future<void> setProfitTarget(double targetPrice) async {
       if (_activePosition == null) {
           throw "No active position to set target for.";
       }
       
       try {
-          // Determine Side (Must clearly be closing side)
-          // If Long, we SELL to close. If Short, we BUY to close.
           String side = _activePosition!.side == "LONG" ? "SELL" : "BUY";
           
           await _orderSigner.executeLimitOrder(
               symbol: _activePosition!.symbol,
               side: side,
-              quantity: _activePosition!.absAmt, // Close full amount
+              quantity: _activePosition!.absAmt,
               price: targetPrice,
-              reduceOnly: true // Ensure it only reduces/closes
+              reduceOnly: true
           );
           
-          // Optionally trigger local vibration or toast?
           try { Vibration.vibrate(pattern: [50, 50, 50]); } catch (e) { /* ignore */ }
           
       } catch (e) {
           rethrow;
       }
+  }
+
+  // Quick Target Logic ($2, $5, $10)
+  Future<void> setQuickTarget(double dollarProfit) async {
+      if (_activePosition == null) return;
+      
+      double entry = _activePosition!.entryPrice;
+      double size = _activePosition!.absAmt;
+      if (size == 0) return;
+
+      // Profit = (Exit - Entry) * Size
+      // Exit = (Profit / Size) + Entry (for Long)
+      // Exit = Entry - (Profit / Size) (for Short)
+      
+      double priceDelta = dollarProfit / size;
+      double targetPrice = 0.0;
+
+      if (_activePosition!.side == "LONG") {
+          targetPrice = entry + priceDelta;
+      } else {
+          targetPrice = entry - priceDelta;
+      }
+
+      await setProfitTarget(targetPrice);
   }
 
   void clearHistory() {

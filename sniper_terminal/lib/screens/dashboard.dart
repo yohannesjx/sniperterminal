@@ -5,7 +5,7 @@ import 'package:sniper_terminal/widgets/coin_selector.dart';
 import 'package:sniper_terminal/widgets/sonar_display.dart';
 import 'package:sniper_terminal/widgets/sniper_card.dart';
 import 'package:sniper_terminal/widgets/live_sniper_hud.dart';
-import 'package:sniper_terminal/widgets/live_position_card.dart'; // Keep for reference or remove if fully replaced
+
 import 'package:sniper_terminal/services/permission_checker.dart';
 import 'package:sniper_terminal/services/order_signer.dart';
 import 'package:sniper_terminal/services/websocket_service.dart';
@@ -127,7 +127,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     builder: (context, state, child) {
                         // 3. LIVE POSITION HUD (Replaces Card)
                         if (state.activePosition != null) {
-                          return const LiveSniperHUD();
+                          return Column(
+                            children: [
+                              const Expanded(child: LiveSniperHUD()),
+                              // QUICK TARGET TOGGLE
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    _buildTargetButton(context, state, 2.0),
+                                    _buildTargetButton(context, state, 5.0),
+                                    _buildTargetButton(context, state, 10.0),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
                         } else {
                           return SniperCard(
                             onExecute: () {
@@ -163,6 +179,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTargetButton(BuildContext context, SniperState state, double amount) {
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.grey[900],
+        side: const BorderSide(color: Colors.greenAccent),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      onPressed: () {
+        state.setQuickTarget(amount);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('🎯 Target Set: +\$$amount')));
+        try { Vibration.vibrate(duration: 50); } catch (_) {}
+      },
+      child: Text(
+        '+\$${amount.toStringAsFixed(0)}',
+        style: GoogleFonts.orbitron(color: Colors.greenAccent, fontWeight: FontWeight.bold),
       ),
     );
   }

@@ -47,17 +47,11 @@ type Alert struct {
 
 // Valid symbols for monitoring (Top 10)
 var validSymbols = map[string]bool{
-	"BTCUSDT":  true,
-	"ETHUSDT":  true,
-	"SOLUSDT":  true,
-	"BNBUSDT":  true,
-	"XRPUSDT":  true,
-	"ADAUSDT":  true,
-	"DOGEUSDT": true,
-	"AVAXUSDT": true,
-	"TRXUSDT":  true,
-	"PEPEUSDT": true,
-	"SHIBUSDT": true, // Just in case
+	"BTCUSDT": true, "ETHUSDT": true, "BNBUSDT": true, "SOLUSDT": true, "XRPUSDT": true,
+	"SUIUSDT": true, "AVAXUSDT": true, "ADAUSDT": true, "DOGEUSDT": true, "LINKUSDT": true,
+	"HYPEUSDT": true, "FETUSDT": true, "TAOUSDT": true, "ARBUSDT": true, "OPUSDT": true,
+	"PEPEUSDT": true, "WIFUSDT": true, "SHIBUSDT": true, "TRXUSDT": true, "LTCUSDT": true,
+	"NEARUSDT": true, "INJUSDT": true, "APTUSDT": true, "RENDERUSDT": true, "SEIUSDT": true,
 }
 
 // ============================================================================
@@ -92,17 +86,20 @@ type CoinManager struct {
 func NewCoinManager() *CoinManager {
 	return &CoinManager{
 		symbols: []string{
-			"BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
-			"ADAUSDT", "DOGEUSDT", "AVAXUSDT", "TRXUSDT", "PEPEUSDT",
+			"BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
+			"SUIUSDT", "AVAXUSDT", "ADAUSDT", "DOGEUSDT", "LINKUSDT",
+			"HYPEUSDT", "FETUSDT", "TAOUSDT", "ARBUSDT", "OPUSDT",
+			"PEPEUSDT", "WIFUSDT", "SHIBUSDT", "TRXUSDT", "LTCUSDT",
+			"NEARUSDT", "INJUSDT", "APTUSDT", "RENDERUSDT", "SEIUSDT",
 		},
 		exchanges: []Exchange{
 			&BinanceFutures{},
-			&BybitV5{},
-			&OKXFutures{},
-			&KrakenFutures{},
-			&CoinbaseAdvanced{},
-			&CryptoCom{},
-			&KuCoinFutures{},
+			// &BybitV5{}, // Commenting out secondary exchanges to focus on Binance for initial stability with 25 pairs
+			// &OKXFutures{},
+			// &KrakenFutures{},
+			// &CoinbaseAdvanced{},
+			// &CryptoCom{},
+			// &KuCoinFutures{},
 		},
 	}
 }
@@ -553,8 +550,8 @@ func (a *Analyzer) Analyze(trade Trade) Alert {
 					log.Printf("🐳 WHALE DETECTED & VALIDATED! REQUESTING APPROVAL for %s %s (Ratio: %.1f)...", tradeSide, trade.Symbol, ratio)
 
 					// SENTINEL MODE: Spoof Verification (1.5s Delay)
-					log.Printf("⏳ VERIFYING SPOOF (%s)... waiting 1.5s", sig.Symbol)
-					time.Sleep(1500 * time.Millisecond)
+					log.Printf("⏳ VERIFYING SPOOF (%s)... waiting 0.8s", sig.Symbol)
+					time.Sleep(800 * time.Millisecond)
 					// In a real HFT system, we would re-check the orderbook depth here.
 					// For this implementation, the delay ensures we don't react to flashes.
 
@@ -720,7 +717,13 @@ func extractSymbol(streamName string) string {
 }
 
 func (b *BinanceFutures) Start(out chan<- Trade, analyzer *Analyzer) {
-	symbols := []string{"btcusdt", "ethusdt", "solusdt", "bnbusdt", "xrpusdt", "adausdt", "dogeusdt", "avaxusdt", "trxusdt", "pepeusdt"}
+	symbols := []string{
+		"btcusdt", "ethusdt", "bnbusdt", "solusdt", "xrpusdt",
+		"suiusdt", "avaxusdt", "adausdt", "dogeusdt", "linkusdt",
+		"hypeusdt", "fetusdt", "taousdt", "arbusdt", "opusdt",
+		"pepeusdt", "wifusdt", "shibusdt", "trxusdt", "ltcusdt",
+		"nearusdt", "injusdt", "aptusdt", "renderusdt", "seiusdt",
+	}
 	var streams []string
 	for _, s := range symbols {
 		streams = append(streams, fmt.Sprintf("%s@aggTrade", s), fmt.Sprintf("%s@depth5@100ms", s))

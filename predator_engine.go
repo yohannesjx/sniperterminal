@@ -567,6 +567,12 @@ func (pe *PredatorEngine) evaluateCandidate(symbol, side string, price, volume, 
 		}
 	}
 
+	// 🚨 AGGRESSIVE OVERRIDE: If Volume Score > $1M, Ignore Trend
+	if volume > 1000000 {
+		valid = true
+		log.Printf("🔥 HIGH CONVICTION OVERRIDE: %s %s (Score: $%.0f) ignored trend check.", side, symbol, volume)
+	}
+
 	if !valid {
 		return nil
 	}
@@ -574,8 +580,8 @@ func (pe *PredatorEngine) evaluateCandidate(symbol, side string, price, volume, 
 	// 2. Dynamic Thresholds (Relaxed for Momentum)
 	isSafety := pe.IsSafetyMode()
 
-	minRatio := 1.15 // 1.15 Aggressive Entry (Was 1.25)
-	maxExt := 0.0022 // 0.22% Aggressive Chase (Was 0.20%)
+	minRatio := 1.10 // 1.10 Aggressive Entry (Was 1.15)
+	maxExt := 0.0030 // 0.30% Aggressive Chase (Was 0.22%)
 
 	if isSafety {
 		minRatio = 1.50 // Strict Safety
@@ -593,7 +599,7 @@ func (pe *PredatorEngine) evaluateCandidate(symbol, side string, price, volume, 
 
 	// Adjust Max Extension for SOL (Volatility Allowance)
 	if strings.Contains(NormalizeSymbol(symbol), "SOL") {
-		maxExt = 0.0040 // 0.40% for SOL
+		maxExt = 0.0050 // 0.50% for SOL (Volatile)
 	}
 
 	if ema9 > 0 {
