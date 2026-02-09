@@ -718,33 +718,46 @@ func (pe *PredatorEngine) attemptExecution(candidate *PredatorPosition) {
 			return
 		}
 	}
-
-	// 1. Local State Check
-	if _, exists := pe.positions[candidate.Symbol]; exists {
-		pe.mu.Unlock()
-		log.Printf("🔇 POSITION LOCK (Local): Already in %s. Skipping attack.", candidate.Symbol)
-		return
-	}
 	pe.mu.Unlock()
 
-	// 2. API Position Check (Hard Lock)
-	if pe.CheckLivePosition(candidate.Symbol) {
-		log.Printf("🔇 POSITION LOCK (API): Binance reports active %s position. Skipping.", candidate.Symbol)
-		return
-	}
+	// ---------------------------------------------------------
+	// CLIENT-SIDE EXECUTION UPDATE
+	// ---------------------------------------------------------
+	// We do NOT execute on backend anymore to avoid -2015 IP Errors.
+	// Signals are already broadcasted in scanForWhales.
+	// We simply return here to stop the engine from trying to trade.
+	// log.Printf("🔇 BACKEND EXECUTION DISABLED (Client-Side Mode): Skipping %s", candidate.Symbol)
+	return
 
-	targetNotional := candidate.MarginUsed
-	if targetNotional == 0 {
-		return
-	}
+	// 1. Local State Check
+	/*
+		pe.mu.Lock()
+		if _, exists := pe.positions[candidate.Symbol]; exists {
+			pe.mu.Unlock()
+			log.Printf("🔇 POSITION LOCK (Local): Already in %s. Skipping attack.", candidate.Symbol)
+			return
+		}
+		pe.mu.Unlock()
 
-	// 3. Global Guard Check
-	if !pe.guard.CanEnter(candidate.Symbol, targetNotional) {
-		return
-	}
+		// 2. API Position Check (Hard Lock)
+		if pe.CheckLivePosition(candidate.Symbol) {
+			log.Printf("🔇 POSITION LOCK (API): Binance reports active %s position. Skipping.", candidate.Symbol)
+			return
+		}
 
-	// EXECUTE
-	pe.executeTrade(candidate)
+		targetNotional := candidate.MarginUsed
+		if targetNotional == 0 {
+			return
+		}
+
+		// 3. Global Guard Check
+		if !pe.guard.CanEnter(candidate.Symbol, targetNotional) {
+			return
+		}
+
+		// EXECUTE
+		pe.executeTrade(candidate)
+	*/
 }
 
 func (pe *PredatorEngine) executeTrade(pos *PredatorPosition) {
