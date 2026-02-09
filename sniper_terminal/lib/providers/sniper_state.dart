@@ -571,26 +571,49 @@ class SniperState extends ChangeNotifier {
 
   // Quick Target Logic ($2, $5, $10)
   Future<void> setQuickTarget(double dollarProfit) async {
-      if (_activePosition == null) return;
-      
-      double entry = _activePosition!.entryPrice;
-      double size = _activePosition!.absAmt;
-      if (size == 0) return;
+    if (_activePosition == null) return;
+    
+    // 1. INSTANT HARVEST CHECK
+    // If we are already in profit >= target, CLOSE NOW.
+    if (_activePosition!.unRealizedProfit >= dollarProfit) {
+         print("⚡ [INSTANT HARVEST] PnL (${_activePosition!.unRealizedProfit}) >= Target ($dollarProfit). CLOSING NOW.");
+         try {
+             String side = _activePosition!.positionAmt > 0 ? "SELL" : "BUY";
+             await _orderSigner.executeMarketOrder(
+                 symbol: _activePosition!.symbol,
+                 side: side,
+                 quantity: _activePosition!.absAmt,
+                 reduceOnly: true
+             );
+             // Vibration handled by order signer success usually, but we can double up for feel
+             try { Vibration.vibrate(pattern: [50, 50, 50, 100]); } catch (_) {}
+             return;
+         } catch (e) {
+             print("❌ Instant Harvest Failed: $e");
+             // Fallthrough to set limit? No, better to alert.
+             rethrow;
+         }
+    }
 
-      // Profit = (Exit - Entry) * Size
-      // Exit = (Profit / Size) + Entry (for Long)
-      // Exit = Entry - (Profit / Size) (for Short)
-      
-      double priceDelta = dollarProfit / size;
-      double targetPrice = 0.0;
+    // 2. SET LIMIT ORDER (Standard Behavior)
+    double entry = _activePosition!.entryPrice;
+    double size = _activePosition!.absAmt;
+    if (size == 0) return;
 
-      if (_activePosition!.side == "LONG") {
-          targetPrice = entry + priceDelta;
-      } else {
-          targetPrice = entry - priceDelta;
-      }
+    // Profit = (Exit - Entry) * Size
+    // Exit = (Profit / Size) + Entry (for Long)
+    // Exit = Entry - (Profit / Size) (for Short)
 
-      await setProfitTarget(targetPrice);
+    double priceDelta = dollarProfit / size;
+    double targetPrice = 0.0;
+
+    if (_activePosition!.side == "LONG") {
+      targetPrice = entry + priceDelta;
+    } else {
+      targetPrice = entry - priceDelta;
+    }
+
+    await setProfitTarget(targetPrice);
   }
 
   void clearHistory() {

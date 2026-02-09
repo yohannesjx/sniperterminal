@@ -123,12 +123,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: SnipeCard(signal: signals.first),
                         ),
                       
-                      // 2. ACTIVE POSITION HUD (If any)
                       if (state.activePosition != null)
-                         const SizedBox(
-                             height: 200, 
-                             child: LiveSniperHUD()
-                         ),
+                          Expanded(
+                            child: Column(
+                              children: [
+                                const Expanded(child: LiveSniperHUD()),
+                                // QUICK TARGET TOGGLE
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      _buildTargetButton(context, state, 2.0),
+                                      _buildTargetButton(context, state, 5.0),
+                                      _buildTargetButton(context, state, 10.0),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                       
                       // 3. QUEUE TAIL (Compact List)
                       if (signals.length > 1) 
@@ -170,6 +184,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
 
+
+  Widget _buildTargetButton(BuildContext context, SniperState state, double amount) {
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.grey[900],
+        side: const BorderSide(color: Colors.greenAccent),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      onPressed: () {
+        state.setQuickTarget(amount);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('🎯 Target Set: +\$$amount')));
+        try { Vibration.vibrate(duration: 50); } catch (_) {}
+      },
+      child: Text(
+        '+\$${amount.toStringAsFixed(0)}',
+        style: GoogleFonts.orbitron(color: Colors.greenAccent, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
 
   void _showSystemOfflineDialog(BuildContext context, SniperState state) {
     final failures = <String>[];
