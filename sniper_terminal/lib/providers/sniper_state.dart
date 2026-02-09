@@ -312,6 +312,75 @@ class SniperState extends ChangeNotifier {
     _isMonitoring = false;
   }
   
+  // --- QUEUE & SNIPE LOGIC ---
+
+  // 1. Sorted Signal Queue (Priority: Score * Ratio)
+  List<Signal> get sortedSignals {
+      final valid = _signalHistory.where((s) => 
+          DateTime.fromMillisecondsSinceEpoch(s.timestamp).difference(DateTime.now()).inMinutes.abs() < 60
+      ).toList();
+      
+      valid.sort((a, b) {
+          double scoreA = a.score * (double.tryParse(a.tier) ?? 1.0); // Use Ratio if available, else 1
+          double scoreB = b.score * (double.tryParse(b.tier) ?? 1.0);
+          return scoreB.compareTo(scoreA); // Descending
+      });
+      return valid;
+  }
+
+  // 2. Cumulative Fleet Profit
+  double get cumulativeProfit {
+      return _positions.fold(0.0, (sum, p) => sum + p.unRealizedProfit);
+  }
+
+  // 3. Close All In Profit
+  Future<void> closeAllInProfit() async {
+      final profitable = _positions.where((p) => p.unRealizedProfit > 1.0).toList(); // Net > $1
+      
+      for (var p in profitable) {
+          try {
+             String side = p.positionAmt > 0 ? "SELL" : "BUY";
+             await _orderSigner.executeMarketOrder(
+                 symbol: p.symbol,
+                 side: side,
+                 quantity: p.absAmt,
+                 reduceOnly: true
+             );
+          } catch (e) {
+              print("Failed to close ${p.symbol}: $e");
+          }
+      }
+      notifyListeners();
+      try { Vibration.vibrate(pattern: [50, 50, 200]); } catch (_) {}
+  }
+
+  // 4. One-Tap Snipe Execution
+  Future<void> executeSnipe(Signal signal) async {
+       // Auto-calculate for $50 Margin @ 10x (Total $500 Notional)
+       double notional = 500.0;
+       double quantity = notional / signal.price;
+       
+       String side = signal.side == "LONG" ? "BUY" : "SELL";
+       
+       try {
+           await _orderSigner.executeMarketOrder(
+               symbol: signal.symbol,
+               side: side,
+               quantity: quantity
+           );
+           
+           // Auto Set TP/SL?
+           // For now, raw snipe.
+           
+           notifyListeners();
+           try { Vibration.vibrate(duration: 100); } catch (_) {}
+       } catch (e) {
+           rethrow;
+       }
+  }
+
+  // --- EXISTING METHODS BELOW ---
+  
   Future<void> _fetchPositions() async {
       final newPositions = await _orderSigner.fetchPositions();
       _positions = newPositions;

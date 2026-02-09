@@ -475,8 +475,10 @@ func (pe *PredatorEngine) scanForWhales(symbol string, depth binanceDepthData) {
 					Side:      side,
 					Entry:     price,
 					Score:     candidate.Volume,
-					Tier:      "🟡 Tier 2 (Test)", // Default, updated in evaluateCandidate
-					StopLoss:  price * 0.99,      // Placeholder, refined later
+					Volume:    candidate.Volume,  // Added for Frontend Viz
+					Ratio:     ratio,             // Added for Frontend Viz
+					Tier:      "🟡 Tier 2 (Test)", // Default
+					StopLoss:  price * 0.99,      // Placeholder
 					Target:    price * 1.01,      // Placeholder
 					Timestamp: ts,
 					Status:    "DETECTED", // Initial Status
@@ -515,9 +517,13 @@ func (pe *PredatorEngine) scanForWhales(symbol string, depth binanceDepthData) {
 					if pe.hub != nil {
 						// Update Signal Properties from Evaluation
 						sig.Tier = pos.Tier
-						sig.StopLoss = pos.StopLoss // Now includes accurate SL
-						sig.Target = pos.TakeProfit // Now includes accurate TP
-						sig.Status = "ACTIVE"       // Ready for execution (client side)
+						sig.StopLoss = pos.StopLoss
+						sig.Target = pos.TakeProfit
+						sig.Status = "ACTIVE"
+						// Ensure Volume/Ratio Persist (or update if needed)
+						sig.Volume = candidate.Volume
+						sig.Ratio = ratio
+						sig.Score = candidate.Volume // Use Volume as Score base
 
 						// Log for debug
 						// log.Printf("🚀 BROADCASTING FINAL: %s %s [%s]", sig.Side, sig.Symbol, sig.Tier)

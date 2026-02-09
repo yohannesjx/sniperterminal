@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sniper_terminal/providers/sniper_state.dart';
-import 'package:sniper_terminal/widgets/coin_selector.dart';
 import 'package:sniper_terminal/widgets/sonar_display.dart';
-import 'package:sniper_terminal/widgets/sniper_card.dart';
+import 'package:sniper_terminal/widgets/snipe_card.dart'; // Corrected Import
 import 'package:sniper_terminal/widgets/live_sniper_hud.dart';
+import 'package:sniper_terminal/widgets/fleet_control_bar.dart';
 
-import 'package:sniper_terminal/services/permission_checker.dart';
+
 import 'package:sniper_terminal/services/order_signer.dart';
 import 'package:sniper_terminal/services/websocket_service.dart';
 import 'package:sniper_terminal/widgets/system_health_bar.dart';
@@ -78,129 +78,98 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       body: SafeArea(
-        child: GestureDetector(
-          onHorizontalDragEnd: (details) {
-            // Sensitivity Check
-            if (details.primaryVelocity == null) return;
+        child: Column(
+          children: [
+            // System Health Bar
+            Consumer<SniperState>(
+              builder: (context, state, child) {
+                return SystemHealthBar(
+                  status: state.healthStatus,
+                  onTap: () {
+                    if (!state.isSystemHealthy) {
+                      _showSystemOfflineDialog(context, state);
+                    }
+                  },
+                );
+              },
+            ),
             
-            // Swipe Left (Next Coin)
-            if (details.primaryVelocity! < -500) { // Negative velocity = Left
-               Provider.of<SniperState>(context, listen: false).selectNextCoin();
-               try { Vibration.vibrate(duration: 50); } catch (_) {}
-            }
-            
-            // Swipe Right (Prev Coin)
-            if (details.primaryVelocity! > 500) { // Positive velocity = Right
-               Provider.of<SniperState>(context, listen: false).selectPreviousCoin();
-               try { Vibration.vibrate(duration: 50); } catch (_) {}
-            }
-          },
-          child: Column(
-            children: [
-              // System Health Bar
-              Consumer<SniperState>(
+            // MAIN QUEUE AREA
+            Expanded(
+              child: Consumer<SniperState>(
                 builder: (context, state, child) {
-                  return SystemHealthBar(
-                    status: state.healthStatus,
-                    onTap: () {
-                      if (!state.isSystemHealthy) {
-                        _showSystemOfflineDialog(context, state);
-                      }
-                    },
+                  final signals = state.sortedSignals;
+                  
+                  if (signals.isEmpty && state.activePosition == null) {
+                    // SCANNING STATE
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SonarDisplay(), // Reuse sonar animation
+                          const SizedBox(height: 20),
+                          Text("SCANNING FOR WHALES...", style: GoogleFonts.orbitron(color: Colors.grey)),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return Column(
+                    children: [
+                      // 1. TOP PRIORITY CARD (QUEUE HEAD)
+                      if (signals.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: SnipeCard(signal: signals.first),
+                        ),
+                      
+                      // 2. ACTIVE POSITION HUD (If any)
+                      if (state.activePosition != null)
+                         const SizedBox(
+                             height: 200, 
+                             child: LiveSniperHUD()
+                         ),
+                      
+                      // 3. QUEUE TAIL (Compact List)
+                      if (signals.length > 1) 
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: signals.length - 1,
+                            itemBuilder: (context, index) {
+                              final sig = signals[index + 1];
+                              return ListTile(
+                                leading: Icon(
+                                  sig.side == "LONG" ? Icons.arrow_upward : Icons.arrow_downward,
+                                  color: sig.side == "LONG" ? Colors.green : Colors.red,
+                                ),
+                                title: Text(sig.symbol, style: GoogleFonts.orbitron(color: Colors.white)),
+                                subtitle: Text("Score: \${(sig.score/1000).toStringAsFixed(0)}K", style: const TextStyle(color: Colors.grey)),
+                                trailing: Text(
+                                  "\$${sig.price.toStringAsFixed(4)}",
+                                  style: GoogleFonts.robotoMono(color: Colors.white),
+                                ),
+                                onTap: () {
+                                   state.executeSnipe(sig);
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                    ],
                   );
                 },
               ),
-              
-              // 1. Asset Selector
-              const CoinSelector(),
-              
-              // 2. Submarine Sonar
-              const Expanded(
-                flex: 2,
-                child: SonarDisplay(),
-              ),
+            ),
 
-              // 3. Dynamic Card Area (Sniper Signal OR Live Position)
-              Expanded(
-                flex: 5,
-                child: Consumer<SniperState>(
-                    builder: (context, state, child) {
-                        // 3. LIVE POSITION HUD (Replaces Card)
-                        if (state.activePosition != null) {
-                          return Column(
-                            children: [
-                              const Expanded(child: LiveSniperHUD()),
-                              // QUICK TARGET TOGGLE
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    _buildTargetButton(context, state, 2.0),
-                                    _buildTargetButton(context, state, 5.0),
-                                    _buildTargetButton(context, state, 10.0),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          );
-                        } else {
-                          return SniperCard(
-                            onExecute: () {
-                              // Safety Lock: Check system health before execution
-                              if (!state.isSystemHealthy) {
-                                _showSystemOfflineDialog(context, state);
-                                return;
-                              }
-                              
-                              if (state.activeSignal != null) {
-                                PermissionChecker.check(context, onGranted: () {
-                                  state.executeSafeTrade(
-                                    side: state.activeSignal!.side == "LONG" ? "BUY" : "SELL",
-                                    onSuccess: () {
-                                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 Order Executed!')));
-                                    },
-                                    onError: (err) {
-                                      if (mounted)  {
-                                        try { Vibration.vibrate(duration: 500); } catch (_) {}
-                                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
-                                      }
-                                    }
-                                  );
-                                });
-                              }
-                            },
-                          );
-                        }
-                    }
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
+            // BOTTOM: FLEET CONTROLS
+            const FleetControlBar(),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildTargetButton(BuildContext context, SniperState state, double amount) {
-    return ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.grey[900],
-        side: const BorderSide(color: Colors.greenAccent),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-      onPressed: () {
-        state.setQuickTarget(amount);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('🎯 Target Set: +\$$amount')));
-        try { Vibration.vibrate(duration: 50); } catch (_) {}
-      },
-      child: Text(
-        '+\$${amount.toStringAsFixed(0)}',
-        style: GoogleFonts.orbitron(color: Colors.greenAccent, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
+
 
   void _showSystemOfflineDialog(BuildContext context, SniperState state) {
     final failures = <String>[];
