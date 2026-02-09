@@ -511,6 +511,21 @@ func (pe *PredatorEngine) scanForWhales(symbol string, depth binanceDepthData) {
 
 				pos := pe.evaluateCandidate(symbol, side, price, candidate.Volume, ratio)
 				if pos != nil {
+					// 📡 RE-BROADCAST VALIDATED SIGNAL (Tier 1 Update)
+					if pe.hub != nil {
+						// Update Signal Properties from Evaluation
+						sig.Tier = pos.Tier
+						sig.StopLoss = pos.StopLoss // Now includes accurate SL
+						sig.Target = pos.TakeProfit // Now includes accurate TP
+						sig.Status = "ACTIVE"       // Ready for execution (client side)
+
+						// Log for debug
+						// log.Printf("🚀 BROADCASTING FINAL: %s %s [%s]", sig.Side, sig.Symbol, sig.Tier)
+
+						data, _ := json.Marshal(sig)
+						pe.hub.BroadcastSignal(data)
+					}
+
 					pe.attemptExecution(pos)
 
 					// Remove candidate after execution attempt
