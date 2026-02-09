@@ -40,8 +40,9 @@ class OrderSigner {
             'tickSize': tickSize,
             'stepSize': stepSize,
           };
+          // print("Loaded ${sym['symbol']} -> Step: $stepSize"); // Too noisy
         }
-        print('✅ [ORDER-SIGNER] Precision Data Loaded');
+        print('✅ [ORDER-SIGNER] Precision Data Loaded (${_symbolInfo.length} pairs)');
       }
     } catch (e) {
       print('⚠️ [ORDER-SIGNER] Failed to fetch ExchangeInfo: $e');
@@ -57,12 +58,26 @@ class OrderSigner {
   }
 
   String formatQty(String symbol, double qty) {
-    if (!_symbolInfo.containsKey(symbol)) return qty.toStringAsFixed(3);
-    if (!qty.isFinite) return "0"; // Safety Guard
+    if (!_symbolInfo.containsKey(symbol)) {
+        // Try to fetch info if missing? Or default to 1?
+        // Defaulting to 1 might be dangerous for BTC. Defaulting to 3 decimals is safer.
+        return qty.toStringAsFixed(3);
+    }
+    if (!qty.isFinite || qty <= 0) return "0";
+    
     double stepSize = _symbolInfo[symbol]!['stepSize']!;
     int prec = _getPrecision(stepSize);
-    // Quantity should ALWAYS be floored (rounded down) to avoid "Insufficient Balance" errors
+    
+    // Quantity should ALWAYS be floored (rounded down)
     double rounded = (qty / stepSize).floor() * stepSize;
+    
+    // GUARD: If rounding results in 0 but qty > 0, we might have an issue.
+    // However, floor() is correct for exchange rules (can't send partial step).
+    // If rounded == 0, it means qty < stepSize, so we can't trade.
+    // But we should return "0" so the API call fails or we catch it before.
+    
+    if (rounded == 0) return "0";
+
     return rounded.toStringAsFixed(prec);
   }
 
