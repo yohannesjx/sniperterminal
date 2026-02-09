@@ -424,11 +424,11 @@ class SniperState extends ChangeNotifier {
                quantity = maxQtyAllowed;
           }
 
-          // F. PROFIT CHECK ($10 Net)
+          // F. PROFIT CHECK ($1 Net - Allow Scalps)
           double grossProfit = (signal.tp - realEntry).abs() * quantity;
           double estimatedFees = (realEntry * quantity) * 0.001; 
-          if (grossProfit - estimatedFees < 10.0) {
-              throw "🛑 TRADE REJECTED: Profit < \$10.";
+          if (grossProfit - estimatedFees < 1.0) {
+              throw "🛑 TRADE REJECTED: Profit < \$1 (Fees too high).";
           }
 
           // --- QUANT SAFETY CHECK END ---
