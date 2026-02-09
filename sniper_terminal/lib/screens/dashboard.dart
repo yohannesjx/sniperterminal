@@ -78,72 +78,90 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            // System Health Bar
-            Consumer<SniperState>(
-              builder: (context, state, child) {
-                return SystemHealthBar(
-                  status: state.healthStatus,
-                  onTap: () {
-                    if (!state.isSystemHealthy) {
-                      _showSystemOfflineDialog(context, state);
-                    }
-                  },
-                );
-              },
-            ),
+        child: GestureDetector(
+          onHorizontalDragEnd: (details) {
+            // Sensitivity Check
+            if (details.primaryVelocity == null) return;
             
-            // 1. Asset Selector
-            const CoinSelector(),
+            // Swipe Left (Next Coin)
+            if (details.primaryVelocity! < -500) { // Negative velocity = Left
+               Provider.of<SniperState>(context, listen: false).selectNextCoin();
+               try { Vibration.vibrate(duration: 50); } catch (_) {}
+            }
             
-            // 2. Submarine Sonar
-            const Expanded(
-              flex: 2,
-              child: SonarDisplay(),
-            ),
-
-            // 3. Dynamic Card Area (Sniper Signal OR Live Position)
-            Expanded(
-              flex: 5,
-              child: Consumer<SniperState>(
-                  builder: (context, state, child) {
-                      // 3. LIVE POSITION HUD (Replaces Card)
-                      if (state.activePosition != null) {
-                        return const LiveSniperHUD();
-                      } else {
-                        return SniperCard(
-                          onExecute: () {
-                            // Safety Lock: Check system health before execution
-                            if (!state.isSystemHealthy) {
-                              _showSystemOfflineDialog(context, state);
-                              return;
-                            }
-                            
-                            if (state.activeSignal != null) {
-                              PermissionChecker.check(context, onGranted: () {
-                                state.executeSafeTrade(
-                                  side: state.activeSignal!.side == "LONG" ? "BUY" : "SELL",
-                                  onSuccess: () {
-                                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 Order Executed!')));
-                                  },
-                                  onError: (err) {
-                                    if (mounted)  {
-                                      try { Vibration.vibrate(duration: 500); } catch (_) {}
-                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
-                                    }
-                                  }
-                                );
-                              });
-                            }
-                          },
-                        );
+            // Swipe Right (Prev Coin)
+            if (details.primaryVelocity! > 500) { // Positive velocity = Right
+               Provider.of<SniperState>(context, listen: false).selectPreviousCoin();
+               try { Vibration.vibrate(duration: 50); } catch (_) {}
+            }
+          },
+          child: Column(
+            children: [
+              // System Health Bar
+              Consumer<SniperState>(
+                builder: (context, state, child) {
+                  return SystemHealthBar(
+                    status: state.healthStatus,
+                    onTap: () {
+                      if (!state.isSystemHealthy) {
+                        _showSystemOfflineDialog(context, state);
                       }
-                  }
+                    },
+                  );
+                },
               ),
-            ),
-            const SizedBox(height: 20),
-          ],
+              
+              // 1. Asset Selector
+              const CoinSelector(),
+              
+              // 2. Submarine Sonar
+              const Expanded(
+                flex: 2,
+                child: SonarDisplay(),
+              ),
+
+              // 3. Dynamic Card Area (Sniper Signal OR Live Position)
+              Expanded(
+                flex: 5,
+                child: Consumer<SniperState>(
+                    builder: (context, state, child) {
+                        // 3. LIVE POSITION HUD (Replaces Card)
+                        if (state.activePosition != null) {
+                          return const LiveSniperHUD();
+                        } else {
+                          return SniperCard(
+                            onExecute: () {
+                              // Safety Lock: Check system health before execution
+                              if (!state.isSystemHealthy) {
+                                _showSystemOfflineDialog(context, state);
+                                return;
+                              }
+                              
+                              if (state.activeSignal != null) {
+                                PermissionChecker.check(context, onGranted: () {
+                                  state.executeSafeTrade(
+                                    side: state.activeSignal!.side == "LONG" ? "BUY" : "SELL",
+                                    onSuccess: () {
+                                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 Order Executed!')));
+                                    },
+                                    onError: (err) {
+                                      if (mounted)  {
+                                        try { Vibration.vibrate(duration: 500); } catch (_) {}
+                                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+                                      }
+                                    }
+                                  );
+                                });
+                              }
+                            },
+                          );
+                        }
+                    }
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );

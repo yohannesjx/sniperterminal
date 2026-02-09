@@ -325,9 +325,28 @@ class _LiveSniperHUDState extends State<LiveSniperHUD> with SingleTickerProvider
                             children: [
                                 _statCell("SIZE (USDT)", "\$${sizeUsdt.toStringAsFixed(0)}", Colors.white),
                                 _statCell("MARGIN", "\$${marginUsdt.toStringAsFixed(0)}", Colors.white),
-                                // Display leverage as Margin Ratio proxy or blank?
-                                // "Margin Ratio" usually implies risk. Let's show "Risk"
-                                _statCell("RISK", position.liquidationPrice > 0 ? "HIGH" : "SAFE", position.liquidationPrice > 0 ? Colors.orange : Colors.green),
+                                
+                                // STOP LOSS DISPLAY
+                                Builder(
+                                  builder: (context) {
+                                    // Try to get SL from Active Signal
+                                    double stopLoss = 0.0;
+                                    if (state.activeSignal != null && state.activeSignal!.symbol == position.symbol) {
+                                        stopLoss = state.activeSignal!.sl;
+                                    }
+                                    
+                                    // Fallback: 1% from Entry
+                                    if (stopLoss == 0) {
+                                        if (position.positionAmt > 0) {
+                                            stopLoss = position.entryPrice * 0.99;
+                                        } else {
+                                            stopLoss = position.entryPrice * 1.01;
+                                        }
+                                    }
+                                    
+                                    return _statCell("STOP LOSS", "\$${stopLoss.toStringAsFixed(2)}", Colors.orange);
+                                  }
+                                ),
                             ]
                         ),
                     ],
@@ -374,7 +393,16 @@ class _LiveSniperHUDState extends State<LiveSniperHUD> with SingleTickerProvider
                             onChangeEnd: (val) {
                                 try { Vibration.vibrate(duration: 50); } catch (_) {}
                                 if (val > 0) {
-                                     ApiService().setExitTarget(position.symbol, _targetPrice);
+                                     // ApiService().setExitTarget(...) -> OLD
+                                     // SniperState.setProfitTarget(...) -> NEW
+                                     Provider.of<SniperState>(context, listen: false)
+                                         .setProfitTarget(_targetPrice)
+                                         .then((_) => ScaffoldMessenger.of(context).showSnackBar(
+                                             const SnackBar(content: Text("✅ Target Set (Limit Order)"))
+                                         ))
+                                         .catchError((e) => ScaffoldMessenger.of(context).showSnackBar(
+                                             SnackBar(content: Text("❌ Failed: $e"))
+                                         ));
                                 }
                             },
                         ),

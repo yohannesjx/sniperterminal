@@ -19,10 +19,14 @@ class SniperState extends ChangeNotifier {
   // Risk Management
   double _riskAmount = 10.0; // Default $10 risk per trade
   double get riskAmount => _riskAmount;
-
-  // Auto-Take Profit
-  double _targetProfit = 50.0; // Default $50 auto-close
-  double get targetProfit => _targetProfit;
+  
+  // Margin Range Safety Lane ($50 - $60)
+  double _minMargin = 50.0;
+  double _maxMargin = 60.0;
+  
+  double get minMargin => _minMargin;
+  double get maxMargin => _maxMargin;
+  RangeValues get marginRange => RangeValues(_minMargin, _maxMargin);
 
   Future<void> setRiskAmount(double val) async {
     _riskAmount = val;
@@ -30,9 +34,31 @@ class SniperState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setTargetProfit(double val) async {
-    _targetProfit = val;
-    await _storage.write(key: 'target_profit', value: val.toString());
+  Future<void> setMarginRange(RangeValues range) async {
+    _minMargin = range.start;
+    _maxMargin = range.end;
+    await _storage.write(key: 'min_margin', value: _minMargin.toString());
+    await _storage.write(key: 'max_margin', value: _maxMargin.toString());
+    notifyListeners();
+  }
+
+  // Backwards compat for old Max Margin calls 
+  Future<void> setMaxMargin(double val) async {
+      // If used, assume it sets Max, keep Min same? Or ignore.
+      // Deprecated, but for compilation safety if Settings used it.
+      // We updated Settings to use setMarginRange.
+      _maxMargin = val;
+      await _storage.write(key: 'max_margin', value: val.toString());
+      notifyListeners();
+  }
+
+  // Aggressive Mode (Tier 2 Signals)
+  bool _isAggressiveMode = false;
+  bool get isAggressiveMode => _isAggressiveMode;
+
+  Future<void> setAggressiveMode(bool val) async {
+    _isAggressiveMode = val;
+    await _storage.write(key: 'aggressive_mode', value: val.toString());
     notifyListeners();
   }
 
@@ -40,8 +66,14 @@ class SniperState extends ChangeNotifier {
     String? risk = await _storage.read(key: 'risk_amount');
     if (risk != null) _riskAmount = double.tryParse(risk) ?? 10.0;
     
-    String? tp = await _storage.read(key: 'target_profit');
-    if (tp != null) _targetProfit = double.tryParse(tp) ?? 50.0;
+    String? minM = await _storage.read(key: 'min_margin');
+    if (minM != null) _minMargin = double.tryParse(minM) ?? 50.0;
+    
+    String? maxM = await _storage.read(key: 'max_margin');
+    if (maxM != null) _maxMargin = double.tryParse(maxM) ?? 60.0;
+    
+    String? agg = await _storage.read(key: 'aggressive_mode');
+    if (agg != null) _isAggressiveMode = agg == 'true';
 
     notifyListeners();
   }
@@ -103,7 +135,11 @@ class SniperState extends ChangeNotifier {
     _healthService.startMonitoring();
     
     startMonitoring();
-
+    
+    // Load Precision Data for OrderSigner
+    _orderSigner.fetchExchangeInfo().then((_) {
+        print("✅ [SNIPER_STATE] Exchange Info Loaded");
+    });
 
     WebSocketService().adviceStream.listen((data) {
         String sym = data['symbol'].toString();
@@ -152,7 +188,12 @@ class SniperState extends ChangeNotifier {
     });
   }
 
-
+  // Available Coins for Swipe Navigation
+  final List<String> _availableCoins = const [
+    'BTC', 'ETH', 'SOL', 'BNB', 'XRP', 
+    'ADA', 'DOGE', 'AVAX', 'TRX', 'PEPE'
+  ];
+  List<String> get availableCoins => _availableCoins;
 
   void selectCoin(String coin) {
     if (_selectedCoin != coin) {
@@ -165,7 +206,30 @@ class SniperState extends ChangeNotifier {
     }
   }
 
+  void selectNextCoin() {
+    int index = _availableCoins.indexOf(_selectedCoin);
+    if (index == -1) index = 0;
+    
+    int nextIndex = (index + 1) % _availableCoins.length;
+    selectCoin(_availableCoins[nextIndex]);
+  }
+
+  void selectPreviousCoin() {
+    int index = _availableCoins.indexOf(_selectedCoin);
+    if (index == -1) index = 0;
+    
+    int prevIndex = (index - 1);
+    if (prevIndex < 0) prevIndex = _availableCoins.length - 1;
+    
+    selectCoin(_availableCoins[prevIndex]);
+  }
+
   void addSignal(Signal signal) {
+    // FILTER: Only allow Tier 1 unless Aggressive Mode is ON
+    if (signal.tier != "1" && !_isAggressiveMode) {
+        return; 
+    }
+
     _signalHistory.insert(0, signal);
     if (_signalHistory.length > 50) _signalHistory.removeLast();
 
@@ -224,38 +288,6 @@ class SniperState extends ChangeNotifier {
       final newPositions = await _orderSigner.fetchPositions();
       _positions = newPositions;
       _updateActivePosition();
-      
-      // AUTO-CLOSE PROFIT LOGIC
-      for (var pos in _positions) {
-          if (pos.unRealizedProfit >= _targetProfit) {
-              print("💰 [AUTO-TAKE-PROFIT] ${pos.symbol} reached \$${pos.unRealizedProfit.toStringAsFixed(2)} (Target: \$$_targetProfit)");
-              
-              // Prevent multiple close attempts? 
-              // The API call is async, so we might re-enter this loop.
-              // Ideally we track 'closing' state per position, but for now let's fire and forget safely.
-              
-              try {
-                  String side = pos.side == "LONG" ? "SELL" : "BUY";
-                  await _orderSigner.executeMarketOrder(
-                      symbol: pos.symbol, 
-                      side: side, 
-                      quantity: pos.absAmt,
-                      reduceOnly: true
-                  );
-                  
-                  // Local cleanup immediately to prevent double trigger
-                  _positions.removeWhere((p) => p.symbol == pos.symbol);
-                  double profit = pos.unRealizedProfit;
-                  if (profit > 0) {
-                      try { Vibration.vibrate(pattern: [50, 100, 50, 100, 50, 100]); } catch (e) { /* ignore */ } // Cash register sound pattern
-                  }
-                  
-              } catch (e) {
-                  print("❌ [AUTO-TP-FAIL] $e");
-              }
-          }
-      }
-
       notifyListeners();
   }
 
@@ -304,25 +336,76 @@ class SniperState extends ChangeNotifier {
       notifyListeners();
 
       try {
-          // 2. RISK CALCULATION
-          double quantity = 0.0;
           final signal = _activeSignal!;
           
-          if (signal.stopLoss != 0 && (signal.entry - signal.stopLoss).abs() > 0) {
-              double priceDist = (signal.entry - signal.stopLoss).abs();
-              quantity = _riskAmount / priceDist;
-          } else {
-              double targetNotional = 200.0; 
-              if (signal.symbol.contains("BTC")) targetNotional = 500.0;
-              quantity = targetNotional / signal.entry;
-          }
+          // --- QUANT SAFETY CHECK START ---
           
-          // Safety Guard
-          if (!quantity.isFinite || quantity <= 0) {
-               quantity = 10.0 / signal.entry; 
+          // A. SLIPPAGE BUFFER (0.01%)
+          // Assume entry is slightly worse than signal price
+          double realEntry = signal.entry;
+          if (side == "LONG") {
+              realEntry = signal.entry * 1.0001; 
+          } else {
+              realEntry = signal.entry * 0.9999;
           }
 
-          // 3. EXECUTE
+          // B. LEVERAGE GUARD (Max 2% Equity Risk)
+          double equity = await _orderSigner.fetchAccountBalance();
+          if (equity == 0) equity = 1000.0; // Fallback if API fails (or testnet 0) to avoid divide by zero? Better to warn.
+          
+          double maxRiskDollar = equity * 0.02; // 2% of Account
+          double priceRiskPerUnit = (realEntry - signal.sl).abs();
+          
+          if (priceRiskPerUnit == 0) priceRiskPerUnit = realEntry * 0.01; // Prevent div/0 (1% fallback width)
+          
+          double maxQtyAllowed = maxRiskDollar / priceRiskPerUnit;
+
+          // C. MARGIN RANGE CLAMPING ($50 - $60 Safety Lane)
+          // 1. Calculate raw quantity from risk ($10 etc)
+          double rawQty = 0.0;
+          if (signal.stopLoss != 0 && priceRiskPerUnit > 0) {
+              rawQty = _riskAmount / priceRiskPerUnit;
+          } else {
+              // Notional Fallback if SL missing
+              double targetNotional = 200.0; 
+              if (signal.symbol.contains("BTC")) targetNotional = 500.0;
+              rawQty = targetNotional / realEntry;
+          }
+
+          // 2. Clamp projected Margin logic (Approximation 20x for Safety Lane)
+          // We assume user thinks in terms of "Cost" or "Initial Margin".
+          // Projected Margin = (RawQty * Entry) / 20.0;
+          double projectedMargin = (rawQty * realEntry) / 20.0;
+          
+          if (projectedMargin < _minMargin) projectedMargin = _minMargin;
+          if (projectedMargin > _maxMargin) projectedMargin = _maxMargin;
+          
+          // 3. Recalculate Qty from Clamped Margin
+          double quantity = (projectedMargin * 20.0) / realEntry;
+
+          // D. NOTIONAL GUARD (Min $20)
+          double finalNotional = quantity * realEntry;
+          if (finalNotional < 20.0) {
+               print("⚠️ [NOTIONAL GUARD] Boosting trade to \$20 Notional.");
+               quantity = 20.0 / realEntry;
+          }
+          
+          // E. LEVERAGE GUARD CHECK
+          if (quantity > maxQtyAllowed) {
+               print("🛡️ [LEVERAGE GUARD] Cap hit. Reducing to max allowed.");
+               quantity = maxQtyAllowed;
+          }
+
+          // F. PROFIT CHECK ($10 Net)
+          double grossProfit = (signal.tp - realEntry).abs() * quantity;
+          double estimatedFees = (realEntry * quantity) * 0.001; 
+          if (grossProfit - estimatedFees < 10.0) {
+              throw "🛑 TRADE REJECTED: Profit < \$10.";
+          }
+
+          // --- QUANT SAFETY CHECK END ---
+
+          // 4. EXECUTE
           String formattedSymbol = signal.symbol.toUpperCase();
           if (!formattedSymbol.endsWith("USDT")) formattedSymbol += "USDT";
 
@@ -359,9 +442,37 @@ class SniperState extends ChangeNotifier {
     
     // 3. Reset Settings
     _riskAmount = 10.0;
-    _targetProfit = 50.0;
+    _minMargin = 50.0;
+    _maxMargin = 60.0;
+    _isAggressiveMode = false;
     
     notifyListeners();
+  }
+
+  Future<void> setProfitTarget(double targetPrice) async { // NEW
+      if (_activePosition == null) {
+          throw "No active position to set target for.";
+      }
+      
+      try {
+          // Determine Side (Must clearly be closing side)
+          // If Long, we SELL to close. If Short, we BUY to close.
+          String side = _activePosition!.side == "LONG" ? "SELL" : "BUY";
+          
+          await _orderSigner.executeLimitOrder(
+              symbol: _activePosition!.symbol,
+              side: side,
+              quantity: _activePosition!.absAmt, // Close full amount
+              price: targetPrice,
+              reduceOnly: true // Ensure it only reduces/closes
+          );
+          
+          // Optionally trigger local vibration or toast?
+          try { Vibration.vibrate(pattern: [50, 50, 50]); } catch (e) { /* ignore */ }
+          
+      } catch (e) {
+          rethrow;
+      }
   }
 
   void clearHistory() {
@@ -369,4 +480,5 @@ class SniperState extends ChangeNotifier {
     _activeSignal = null;
     notifyListeners();
   }
+
 }

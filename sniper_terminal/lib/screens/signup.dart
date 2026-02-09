@@ -13,6 +13,39 @@ class _SignupScreenState extends State<SignupScreen> {
   final _auth = AuthService();
   bool _isLoading = false;
 
+  Future<void> _loginApple() async {
+    setState(() => _isLoading = true);
+    
+    // Call Apple Login
+    final error = await _auth.signInWithApple();
+    
+    setState(() => _isLoading = false);
+
+    if (error == null) {
+      if (mounted) Navigator.pop(context, true);
+    } else {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Login Failed'),
+          content: SingleChildScrollView(
+            child: Text(
+              error,
+              style: const TextStyle(color: Colors.red, fontFamily: 'Courier', fontSize: 12),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   Future<void> _login() async {
     setState(() => _isLoading = true);
     
@@ -82,6 +115,23 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                       onPressed: _login,
                       child: Text('SIGN UP WITH GOOGLE', style: GoogleFonts.orbitron(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+            const SizedBox(height: 16),
+            _isLoading
+                ? const SizedBox() // progress shown above
+                : SizedBox(
+                    width: double.infinity,
+                    height: 60,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      ),
+                      onPressed: _loginApple,
+                      icon: const Icon(Icons.apple, size: 28),
+                      label: Text('SIGN IN WITH APPLE', style: GoogleFonts.orbitron(fontWeight: FontWeight.bold)),
                     ),
                   ),
           ],

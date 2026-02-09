@@ -242,7 +242,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
               
               Text(
-                'PROFIT TAKING',
+                'SAFETY LANE (MARGIN)',
                 style: GoogleFonts.orbitron(color: Colors.white, fontSize: 18),
               ),
               const SizedBox(height: 10),
@@ -253,28 +253,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Auto-Close At:', style: TextStyle(color: Colors.grey[400])),
+                          Text('Min: \$${state.minMargin.toStringAsFixed(0)}', style: TextStyle(color: Colors.grey[400])),
                           Text(
-                            '\$${state.targetProfit.toStringAsFixed(0)}',
-                            style: GoogleFonts.orbitron(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 18),
+                            'Lane: \$${state.minMargin.toStringAsFixed(0)} - \$${state.maxMargin.toStringAsFixed(0)}',
+                            style: GoogleFonts.orbitron(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 16),
                           ),
+                          Text('Max: \$${state.maxMargin.toStringAsFixed(0)}', style: TextStyle(color: Colors.grey[400])),
                         ],
                       ),
-                      Slider(
-                        value: state.targetProfit,
+                      RangeSlider(
+                        values: state.marginRange,
                         min: 10,
-                        max: 500,
-                        divisions: 49,
+                        max: 1000,
+                        divisions: 99,
                         activeColor: Colors.greenAccent,
                         inactiveColor: Colors.grey[800],
-                        onChanged: (val) => state.setTargetProfit(val),
+                        labels: RangeLabels(
+                          '\$${state.minMargin.toStringAsFixed(0)}', 
+                          '\$${state.maxMargin.toStringAsFixed(0)}'
+                        ),
+                        onChanged: (RangeValues values) {
+                            // Enforce minimum separation? Optional.
+                            state.setMarginRange(values);
+                        },
                       ),
                       Text(
-                        'Automatically close trade if unrealized profit reaches this amount.',
+                        'The bot will force every trade into this \$ zone.\nMin \$20 Notional Guard is active.',
                         style: TextStyle(color: Colors.grey[600], fontSize: 11),
                         textAlign: TextAlign.center,
                       ),
                     ],
+                  );
+                },
+              ),
+
+              const SizedBox(height: 30),
+
+              // AGGRESSIVE MODE TOGGLE
+              Text(
+                'SIGNAL FILTER',
+                style: GoogleFonts.orbitron(color: Colors.white, fontSize: 18),
+              ),
+              const SizedBox(height: 10),
+              Consumer<SniperState>(
+                builder: (context, state, child) {
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[900],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: state.isAggressiveMode ? Colors.redAccent : Colors.grey[800]!),
+                    ),
+                    child: SwitchListTile(
+                      title: Text(
+                        "AGGRESSIVE MODE",
+                        style: GoogleFonts.orbitron(
+                            color: state.isAggressiveMode ? Colors.redAccent : Colors.white, 
+                            fontWeight: FontWeight.bold
+                        ),
+                      ),
+                      subtitle: Text(
+                        state.isAggressiveMode 
+                            ? "WARNING: Tier 2 Signals Enabled. Higher Risk."
+                            : "SAFE: Only Tier 1 (High Quality) Signals shown.",
+                        style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                      ),
+                      value: state.isAggressiveMode,
+                      activeColor: Colors.redAccent,
+                      onChanged: (val) => state.setAggressiveMode(val),
+                    ),
                   );
                 },
               ),

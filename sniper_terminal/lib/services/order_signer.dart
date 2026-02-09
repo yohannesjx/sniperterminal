@@ -198,6 +198,42 @@ class OrderSigner {
     return [];
   }
 
+  /// Fetch Account Balance (Equity)
+  /// endpoint: GET /fapi/v2/account
+  Future<double> fetchAccountBalance() async {
+    final keys = await getKeys();
+    final apiKey = keys['apiKey']?.trim();
+    final secretKey = keys['secretKey']?.trim();
+
+    if (apiKey == null || secretKey == null) return 0.0;
+
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final Map<String, dynamic> params = {
+      'timestamp': timestamp.toString(),
+      'recvWindow': '5000',
+    };
+
+    final queryString = Uri(queryParameters: params).query;
+    final signature = _sign(queryString, secretKey);
+    final finalQuery = '$queryString&signature=$signature';
+    
+    final baseUrl = await _baseUrl;
+    final url = Uri.parse('$baseUrl/fapi/v2/account?$finalQuery');
+
+    try {
+      final response = await _client.get(url, headers: {'X-MBX-APIKEY': apiKey});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // totalMarginBalance is the Equity (Balance + Unrealized PNL)
+        return double.tryParse(data['totalMarginBalance'].toString()) ?? 0.0;
+      }
+    } catch (e) {
+      print("❌ Error fetching balance: $e");
+    }
+    return 0.0;
+  }
+
   /// Close Position Market
   Future<void> closePosition({required String symbol, required double quantity}) async {
     // To close, we execute an opposing order.
@@ -267,6 +303,65 @@ class OrderSigner {
       return jsonDecode(response.body);
     } else {
       throw Exception('Order Failed: ${response.body}');
+    }
+  }
+
+  /// Signs and executes a Limit Order (e.g. Take Profit)
+  Future<Map<String, dynamic>> executeLimitOrder({
+    required String symbol,
+    required String side,
+    required double quantity,
+    required double price,
+    bool reduceOnly = false,
+  }) async {
+    final keys = await getKeys();
+    final apiKey = keys['apiKey']?.trim();
+    final secretKey = keys['secretKey']?.trim();
+
+    if (apiKey == null || secretKey == null) {
+      throw Exception('API Keys not found. Please configure in settings.');
+    }
+
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    
+    // Query Parameters
+    final Map<String, dynamic> params = {
+      'symbol': symbol.toUpperCase(),
+      'side': side.toUpperCase(),
+      'type': 'LIMIT',
+      'timeInForce': 'GTC', // Good Till Cancel
+      'quantity': formatQty(symbol.toUpperCase(), quantity),
+      'price': formatPrice(symbol.toUpperCase(), price),
+      'timestamp': timestamp.toString(),
+      'recvWindow': '5000',
+    };
+
+    if (reduceOnly) {
+      params['reduceOnly'] = 'true';
+    }
+
+    // Generate Signature
+    final queryString = Uri(queryParameters: params).query;
+    final signature = _sign(queryString, secretKey);
+    
+    // Append Signature
+    final finalQuery = '$queryString&signature=$signature';
+    final baseUrl = await _baseUrl;
+    final url = Uri.parse('$baseUrl/fapi/v1/order?$finalQuery');
+
+    print("🔌 [ORDER-SIGNER] Limit Order Target: $url");
+
+    final response = await _client.post(
+      url,
+      headers: {
+        'X-MBX-APIKEY': apiKey,
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Limit Order Failed: ${response.body}');
     }
   }
 

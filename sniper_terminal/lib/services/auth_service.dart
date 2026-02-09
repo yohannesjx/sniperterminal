@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:flutter/services.dart';
 
 class AuthService {
@@ -72,6 +73,45 @@ class AuthService {
     } catch (e) {
       print("❌ [UNKNOWN ERROR] $e");
       return "[UNKNOWN] $e";
+    }
+  }
+
+  // Apple Sign-In
+  Future<String?> signInWithApple() async {
+    print("🍎 [DIAGNOSTIC] Starting Apple Sign-In Flow...");
+    try {
+      // 1. Trigger Apple Sign-In Flow
+      print("👉 [STEP 1] Requesting Apple ID Credential...");
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+      print("✅ [SUCCESS] Apple ID Retrieved: ${appleCredential.userIdentifier}");
+
+      // 2. Create Credential for Firebase
+      print("👉 [STEP 2] Creating Firebase Credential...");
+      final OAuthCredential credential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        accessToken: appleCredential.authorizationCode,
+      );
+
+      // 3. Sign In to Firebase
+      print("👉 [STEP 3] Signing in to Firebase Auth...");
+      final UserCredential userCredential = await _auth.signInWithCredential(credential);
+      print("✅ [SUCCESS] Firebase Sign-In Complete!");
+      print("   > User UID: ${userCredential.user?.uid}");
+      print("   > Email: ${userCredential.user?.email}");
+      
+      return null; // Success
+
+    } on FirebaseAuthException catch (e) {
+      print("❌ [FIREBASE AUTH ERROR] Code: ${e.code}");
+      return "[FIREBASE] ${e.message}";
+    } catch (e) {
+      print("❌ [APPLE SIGN-IN ERROR] $e");
+      return "[APPLE] $e";
     }
   }
 

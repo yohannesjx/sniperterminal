@@ -6,13 +6,10 @@ import 'package:sniper_terminal/providers/sniper_state.dart';
 class CoinSelector extends StatelessWidget {
   const CoinSelector({super.key});
 
-  final List<String> coins = const [
-    'BTC', 'ETH', 'SOL', 'BNB', 'XRP', 
-    'ADA', 'DOGE', 'AVAX', 'TRX', 'PEPE'
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final coins = Provider.of<SniperState>(context).availableCoins;
+    
     return SizedBox(
       height: 60,
       child: ListView.builder(
